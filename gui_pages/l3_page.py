@@ -298,7 +298,7 @@ def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100) -> go.Figure
 def show():
     st.title("L3")
     st.markdown(
-        "**Market by order: Order Book Visualizer with order queue position tracking"
+        "**Market by order: Order Book Visualizer with order queue position tracking**"
     )
 
     init_session_state()

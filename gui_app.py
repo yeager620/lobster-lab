@@ -26,7 +26,7 @@ def main():
     page = st.sidebar.radio(
         "Select View",
         ["L1 - Price Action", "L2 - Price Levels", "L3 - Order Flow"],
-        index=0,
+        index=1,
     )
 
     st.sidebar.markdown("---")

@@ -113,7 +113,7 @@ def format_message_details(msg: pd.Series) -> dict:
 def show():
     st.title("L2")
     st.markdown(
-        "**L2 Order Book Visualizer: Aggregated liquidity by price"
+        "**L2 Order Book Visualizer: Aggregated liquidity by price**"
     )
 
     init_session_state()

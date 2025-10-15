@@ -55,12 +55,31 @@ def get_local_datasets() -> Set[Tuple[str, int]]:
 def get_hf_datasets(repo_id: str) -> Set[Tuple[str, int]]:
     try:
         files = list_repo_files(repo_id, repo_type="dataset")
-        hf_datasets = set()
+
+        # Track datasets with both message and orderbook files
+        dataset_files = {}
         for file in files:
-            match = re.match(r"LOBSTER_SampleFile_(\w+)_\d{4}-\d{2}-\d{2}_(\d+)/", file)
+            match = re.match(
+                r"LOBSTER_SampleFile_(\w+)_(\d{4}-\d{2}-\d{2})_(\d+)/.*_(message|orderbook)_\d+\.csv",
+                file,
+            )
             if match:
-                ticker, levels = match.groups()
-                hf_datasets.add((ticker, int(levels)))
+                ticker, date, levels, file_type = match.groups()
+                key = (ticker, int(levels))
+                if key not in dataset_files:
+                    dataset_files[key] = {"message": False, "orderbook": False}
+                dataset_files[key][file_type] = True
+
+        # Only include datasets with both files
+        hf_datasets = set()
+        for key, files_present in dataset_files.items():
+            if files_present["message"] and files_present["orderbook"]:
+                hf_datasets.add(key)
+            else:
+                ticker, levels = key
+                missing = [k for k, v in files_present.items() if not v]
+                print(f"Warning: {ticker} ({levels} levels) missing {', '.join(missing)} file(s)")
+
         return hf_datasets
     except Exception as e:
         print(f"Warning: HF repo access failed: {e}")
