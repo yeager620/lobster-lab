@@ -81,7 +81,9 @@ def plot_price_candlestick(
     fig = go.Figure()
 
     if not candle_data.empty:
-        candle_times_et = [seconds_to_eastern_time(t, date_str) for t in candle_data["time"]]
+        candle_times_et = [
+            seconds_to_eastern_time(t, date_str) for t in candle_data["time"]
+        ]
         fig.add_trace(
             go.Candlestick(
                 x=candle_times_et,
@@ -98,7 +100,9 @@ def plot_price_candlestick(
     exec_events = msg_window[msg_window["type"].isin([4, 5])]
     if not exec_events.empty:
         exec_prices = exec_events["price"] / 10000.0
-        exec_times_et = [seconds_to_eastern_time(t, date_str) for t in exec_events["time"]]
+        exec_times_et = [
+            seconds_to_eastern_time(t, date_str) for t in exec_events["time"]
+        ]
         fig.add_trace(
             go.Scatter(
                 x=exec_times_et,
@@ -315,8 +319,11 @@ def show():
 
     st.markdown("### Price Candlestick Chart")
     fig_candle = plot_price_candlestick(
-        messages, orderbook, current_idx, window_size=chart_window,
-        ticker_name=st.session_state.selected_ticker
+        messages,
+        orderbook,
+        current_idx,
+        window_size=chart_window,
+        ticker_name=st.session_state.selected_ticker,
     )
     st.plotly_chart(
         fig_candle, use_container_width=True, key=f"l1_candle_{current_idx}"

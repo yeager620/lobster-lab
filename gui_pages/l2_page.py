@@ -108,7 +108,7 @@ def format_message_details(msg: pd.Series, date_str: str = "2012-06-21") -> dict
     direction_map = {1: "Buy", -1: "Sell"}
 
     return {
-        "Time": seconds_to_eastern_time(msg['time'], date_str),
+        "Time": seconds_to_eastern_time(msg["time"], date_str),
         "Type": message_types.get(int(msg["type"]), "Unknown"),
         "Order ID": f"{int(msg['order_id']):,}",
         "Size": f"{int(msg['size']):,}",

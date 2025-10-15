@@ -110,18 +110,20 @@ def plot_order_book_depth_with_queue(
             queue_length = len(orders_sorted)
 
             # Create hover text with queue details
-            hover_lines = [f"<b>Bid @ ${price:.2f}</b>",
-                          f"Total Size: {total_size:,} shares",
-                          f"Orders in Queue: {queue_length}",
-                          "<br><b>Queue Details:</b>"]
+            hover_lines = [
+                f"<b>Bid @ ${price:.2f}</b>",
+                f"Total Size: {total_size:,} shares",
+                f"Orders in Queue: {queue_length}",
+                "<br><b>Queue Details:</b>",
+            ]
 
             # Show top 5 orders in queue
             for i, order in enumerate(orders_sorted[:5]):
                 hover_lines.append(
-                    f"  #{i+1}: {order['size']:,} sh (ID: {order['id']})"
+                    f"  #{i + 1}: {order['size']:,} sh (ID: {order['id']})"
                 )
             if len(orders_sorted) > 5:
-                hover_lines.append(f"  ... and {len(orders_sorted)-5} more")
+                hover_lines.append(f"  ... and {len(orders_sorted) - 5} more")
 
             # Add main bar for total size
             fig.add_trace(
@@ -145,10 +147,12 @@ def plot_order_book_depth_with_queue(
                 if cumulative < total_size:  # Don't draw line at the very end
                     fig.add_shape(
                         type="line",
-                        x0=cumulative, x1=cumulative,
-                        y0=price - 0.003, y1=price + 0.003,  # Small vertical line
+                        x0=cumulative,
+                        x1=cumulative,
+                        y0=price - 0.003,
+                        y1=price + 0.003,  # Small vertical line
                         line=dict(color="rgba(255, 255, 255, 0.6)", width=2),
-                        layer="above"
+                        layer="above",
                     )
 
     # Ask side - aggregate bars with individual order segments
@@ -159,18 +163,20 @@ def plot_order_book_depth_with_queue(
             queue_length = len(orders_sorted)
 
             # Create hover text with queue details
-            hover_lines = [f"<b>Ask @ ${price:.2f}</b>",
-                          f"Total Size: {total_size:,} shares",
-                          f"Orders in Queue: {queue_length}",
-                          "<br><b>Queue Details:</b>"]
+            hover_lines = [
+                f"<b>Ask @ ${price:.2f}</b>",
+                f"Total Size: {total_size:,} shares",
+                f"Orders in Queue: {queue_length}",
+                "<br><b>Queue Details:</b>",
+            ]
 
             # Show top 5 orders in queue
             for i, order in enumerate(orders_sorted[:5]):
                 hover_lines.append(
-                    f"  #{i+1}: {order['size']:,} sh (ID: {order['id']})"
+                    f"  #{i + 1}: {order['size']:,} sh (ID: {order['id']})"
                 )
             if len(orders_sorted) > 5:
-                hover_lines.append(f"  ... and {len(orders_sorted)-5} more")
+                hover_lines.append(f"  ... and {len(orders_sorted) - 5} more")
 
             # Add main bar for total size
             fig.add_trace(
@@ -194,18 +200,24 @@ def plot_order_book_depth_with_queue(
                 if cumulative < total_size:  # Don't draw line at the very end
                     fig.add_shape(
                         type="line",
-                        x0=cumulative, x1=cumulative,
-                        y0=price - 0.003, y1=price + 0.003,  # Small vertical line
+                        x0=cumulative,
+                        x1=cumulative,
+                        y0=price - 0.003,
+                        y1=price + 0.003,  # Small vertical line
                         line=dict(color="rgba(255, 255, 255, 0.6)", width=2),
-                        layer="above"
+                        layer="above",
                     )
 
     # Calculate reasonable x-axis range
     max_size = 0
     if bid_levels:
-        max_size = max(max_size, max(sum(o["size"] for o in orders) for _, orders in bid_levels))
+        max_size = max(
+            max_size, max(sum(o["size"] for o in orders) for _, orders in bid_levels)
+        )
     if ask_levels:
-        max_size = max(max_size, max(sum(o["size"] for o in orders) for _, orders in ask_levels))
+        max_size = max(
+            max_size, max(sum(o["size"] for o in orders) for _, orders in ask_levels)
+        )
 
     fig.update_layout(
         title="Order Book Depth",
@@ -221,7 +233,9 @@ def plot_order_book_depth_with_queue(
     return fig, bid_levels, ask_levels
 
 
-def format_order_queue_table(price_levels: List, side: str, date_str: str = "2012-06-21") -> pd.DataFrame:
+def format_order_queue_table(
+    price_levels: List, side: str, date_str: str = "2012-06-21"
+) -> pd.DataFrame:
     rows = []
     for price, orders in price_levels:
         orders_sorted = sorted(orders, key=lambda x: x["time"])
@@ -232,7 +246,7 @@ def format_order_queue_table(price_levels: List, side: str, date_str: str = "201
                     "Queue Pos": f"{i + 1}/{len(orders_sorted)}",
                     "Order ID": order["id"],
                     "Size": f"{order['size']:,}",
-                    "Time": seconds_to_eastern_time(order['time'], date_str),
+                    "Time": seconds_to_eastern_time(order["time"], date_str),
                 }
             )
 
@@ -268,7 +282,9 @@ def plot_order_size_distribution(order_book: Dict) -> go.Figure:
     return fig
 
 
-def plot_order_timeline(messages: pd.DataFrame, order_id: int, date_str: str = "2012-06-21") -> go.Figure:
+def plot_order_timeline(
+    messages: pd.DataFrame, order_id: int, date_str: str = "2012-06-21"
+) -> go.Figure:
     order_msgs = messages[messages["order_id"] == order_id].copy()
 
     if order_msgs.empty:
@@ -327,7 +343,9 @@ def plot_order_timeline(messages: pd.DataFrame, order_id: int, date_str: str = "
     return fig
 
 
-def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100, date_str: str = "2012-06-21") -> go.Figure:
+def plot_order_flow_rate(
+    messages: pd.DataFrame, window: int = 100, date_str: str = "2012-06-21"
+) -> go.Figure:
     new_orders = messages[messages["type"] == 1].copy()
 
     if len(new_orders) < window:
