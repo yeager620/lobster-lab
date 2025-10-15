@@ -4,7 +4,14 @@ import plotly.graph_objects as go
 import plotly.colors as pc
 from typing import Dict, List, Tuple
 from collections import defaultdict
-from .shared import init_session_state, load_ticker_data, seconds_to_eastern_time, get_dataset_date
+from .shared import (
+    init_session_state,
+    load_ticker_data,
+    seconds_to_eastern_time,
+    get_dataset_date,
+    apply_global_styles,
+    render_metrics_grid,
+)
 
 
 def reconstruct_order_book_state(messages: pd.DataFrame, up_to_idx: int) -> Dict:
@@ -383,6 +390,7 @@ def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100, date_str: st
 
 
 def show():
+    apply_global_styles()
     st.title("L3")
     st.markdown(
         "**Market by order: Order Book Visualizer with order queue position tracking**"
@@ -562,17 +570,19 @@ def show():
 
     st.markdown("---")
     st.markdown("### Current Order Book State")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Bid Orders", len(order_book["bids"]))
-    with col2:
-        st.metric("Total Ask Orders", len(order_book["asks"]))
-    with col3:
-        total_bid_volume = sum(o["size"] for o in order_book["bids"].values())
-        st.metric("Bid Volume", f"{total_bid_volume:,}")
-    with col4:
-        total_ask_volume = sum(o["size"] for o in order_book["asks"].values())
-        st.metric("Ask Volume", f"{total_ask_volume:,}")
+
+    total_bid_volume = sum(o["size"] for o in order_book["bids"].values())
+    total_ask_volume = sum(o["size"] for o in order_book["asks"].values())
+
+    render_metrics_grid(
+        [
+            ("Total Bid Orders", f"{len(order_book['bids']):,}"),
+            ("Total Ask Orders", f"{len(order_book['asks']):,}"),
+            ("Bid Volume", f"{total_bid_volume:,}"),
+            ("Ask Volume", f"{total_ask_volume:,}"),
+        ],
+        columns=2,
+    )
 
     st.markdown("---")
 
