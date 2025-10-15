@@ -225,14 +225,9 @@ def get_available_tickers(sample_files: dict) -> dict:
 
 def init_session_state():
     if "selected_ticker" not in st.session_state:
-        available = get_available_tickers(ALL_SAMPLE_FILES)
-        if available:
-            # Default to SPY (30 levels) if available
-            default_ticker = "SPY (30 levels)"
-            if default_ticker in available:
-                st.session_state.selected_ticker = default_ticker
-            else:
-                st.session_state.selected_ticker = list(available.keys())[0]
+        # Don't call get_available_tickers during init to avoid triggering downloads
+        # Just set a default that will be validated later
+        st.session_state.selected_ticker = "SPY (30 levels)"
     if "current_idx" not in st.session_state:
         st.session_state.current_idx = 0
     if "messages" not in st.session_state:
@@ -252,12 +247,14 @@ def load_ticker_data():
     data_source = "Hugging Face" if USE_HUGGINGFACE else "Local Files"
     st.sidebar.info(f"Data source: {data_source}")
 
+    # Validate that selected ticker exists, otherwise pick first available
+    if st.session_state.selected_ticker not in available_tickers:
+        st.session_state.selected_ticker = list(available_tickers.keys())[0]
+
     selected_ticker = st.sidebar.selectbox(
         "Select Ticker",
         list(available_tickers.keys()),
-        index=list(available_tickers.keys()).index(st.session_state.selected_ticker)
-        if st.session_state.selected_ticker in available_tickers
-        else 0,
+        index=list(available_tickers.keys()).index(st.session_state.selected_ticker),
         key="ticker_selector",
     )
 
