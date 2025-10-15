@@ -45,6 +45,36 @@ def reconstruct_order_book_state(messages: pd.DataFrame, up_to_idx: int) -> Dict
     return order_book
 
 
+def _sample_queue_color(
+    colorscale: str, queue_idx: int, queue_length: int, fallback: str
+) -> str:
+    """Sample a color along a Plotly colorscale with defensive fallbacks."""
+
+    if queue_length <= 1:
+        position = 0.0
+    else:
+        # Normalize the queue index to the 0-1 range while guarding against FP drift
+        denominator = max(queue_length - 1, 1)
+        position = min(max(queue_idx / denominator, 0.0), 1.0)
+
+    try:
+        sampled = pc.sample_colorscale(colorscale, [position])
+        if sampled:
+            return sampled[0]
+    except (ValueError, TypeError, IndexError):
+        pass
+
+    # Fallback: use the last color in the named colorscale if available, otherwise default
+    try:
+        resolved_scale = pc.get_colorscale(colorscale)
+        if resolved_scale:
+            return resolved_scale[-1][1]
+    except (ValueError, TypeError, IndexError):
+        pass
+
+    return fallback
+
+
 def plot_order_book_depth_with_queue(
     order_book: Dict, levels: int = 10
 ) -> Tuple[go.Figure, List, List]:
@@ -71,11 +101,7 @@ def plot_order_book_depth_with_queue(
             cumulative_size = 0
             queue_length = len(orders_sorted)
             for queue_idx, order in enumerate(orders_sorted):
-                if queue_length > 1:
-                    scale_value = queue_idx / (queue_length - 1)
-                else:
-                    scale_value = 0
-                color = pc.sample_colorscale("Greens", scale_value)[0]
+                color = _sample_queue_color("Greens", queue_idx, queue_length, "green")
                 hover_text = (
                     f"<b>Bid @ ${price:.2f}</b><br>"
                     f"Queue Pos: {queue_idx + 1}/{queue_length}<br>"
@@ -106,11 +132,7 @@ def plot_order_book_depth_with_queue(
             cumulative_size = 0
             queue_length = len(orders_sorted)
             for queue_idx, order in enumerate(orders_sorted):
-                if queue_length > 1:
-                    scale_value = queue_idx / (queue_length - 1)
-                else:
-                    scale_value = 0
-                color = pc.sample_colorscale("Reds", scale_value)[0]
+                color = _sample_queue_color("Reds", queue_idx, queue_length, "red")
                 hover_text = (
                     f"<b>Ask @ ${price:.2f}</b><br>"
                     f"Queue Pos: {queue_idx + 1}/{queue_length}<br>"
