@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.colors as pc
 from typing import Dict, List, Tuple
 from collections import defaultdict
 from .shared import init_session_state, load_ticker_data
@@ -44,6 +45,36 @@ def reconstruct_order_book_state(messages: pd.DataFrame, up_to_idx: int) -> Dict
     return order_book
 
 
+def _sample_queue_color(
+    colorscale: str, queue_idx: int, queue_length: int, fallback: str
+) -> str:
+    """Sample a color along a Plotly colorscale with defensive fallbacks."""
+
+    if queue_length <= 1:
+        position = 0.0
+    else:
+        # Normalize the queue index to the 0-1 range while guarding against FP drift
+        denominator = max(queue_length - 1, 1)
+        position = min(max(queue_idx / denominator, 0.0), 1.0)
+
+    try:
+        sampled = pc.sample_colorscale(colorscale, [position])
+        if sampled:
+            return sampled[0]
+    except (ValueError, TypeError, IndexError):
+        pass
+
+    # Fallback: use the last color in the named colorscale if available, otherwise default
+    try:
+        resolved_scale = pc.get_colorscale(colorscale)
+        if resolved_scale:
+            return resolved_scale[-1][1]
+    except (ValueError, TypeError, IndexError):
+        pass
+
+    return fallback
+
+
 def plot_order_book_depth_with_queue(
     order_book: Dict, levels: int = 10
 ) -> Tuple[go.Figure, List, List]:
@@ -65,56 +96,66 @@ def plot_order_book_depth_with_queue(
     fig = go.Figure()
 
     if bid_levels:
-        bid_prices_list = []
-        bid_sizes_list = []
-        bid_hover_text = []
-
         for price, orders in bid_levels:
-            total_size = sum(o["size"] for o in orders)
-            num_orders = len(orders)
-            bid_prices_list.append(price)
-            bid_sizes_list.append(total_size)
-            bid_hover_text.append(
-                f"<b>Bids @ ${price:.2f}</b><br>Total Size: {total_size:,}<br>Orders: {num_orders}"
-            )
+            orders_sorted = sorted(orders, key=lambda x: x["time"])
+            cumulative_size = 0
+            queue_length = len(orders_sorted)
+            for queue_idx, order in enumerate(orders_sorted):
+                color = _sample_queue_color("Greens", queue_idx, queue_length, "green")
+                hover_text = (
+                    f"<b>Bid @ ${price:.2f}</b><br>"
+                    f"Queue Pos: {queue_idx + 1}/{queue_length}<br>"
+                    f"Order ID: {order['id']}<br>"
+                    f"Size: {order['size']:,}<br>"
+                    f"Time: {order['time']:.2f}s"
+                )
 
-        fig.add_trace(
-            go.Bar(
-                x=bid_sizes_list,
-                y=bid_prices_list,
-                orientation="h",
-                name="Bids",
-                marker=dict(color="rgba(0, 180, 0, 0.7)"),
-                hovertemplate="%{customdata}<extra></extra>",
-                customdata=bid_hover_text,
-            )
-        )
+                fig.add_trace(
+                    go.Bar(
+                        x=[order["size"]],
+                        y=[price],
+                        base=[cumulative_size],
+                        orientation="h",
+                        name="Bids" if queue_idx == 0 else None,
+                        marker=dict(color=color),
+                        hovertemplate="%{customdata}<extra></extra>",
+                        customdata=[hover_text],
+                        legendgroup="bids",
+                        showlegend=queue_idx == 0,
+                    )
+                )
+                cumulative_size += order["size"]
 
     if ask_levels:
-        ask_prices_list = []
-        ask_sizes_list = []
-        ask_hover_text = []
-
         for price, orders in ask_levels:
-            total_size = sum(o["size"] for o in orders)
-            num_orders = len(orders)
-            ask_prices_list.append(price)
-            ask_sizes_list.append(total_size)
-            ask_hover_text.append(
-                f"<b>Asks @ ${price:.2f}</b><br>Total Size: {total_size:,}<br>Orders: {num_orders}"
-            )
+            orders_sorted = sorted(orders, key=lambda x: x["time"])
+            cumulative_size = 0
+            queue_length = len(orders_sorted)
+            for queue_idx, order in enumerate(orders_sorted):
+                color = _sample_queue_color("Reds", queue_idx, queue_length, "red")
+                hover_text = (
+                    f"<b>Ask @ ${price:.2f}</b><br>"
+                    f"Queue Pos: {queue_idx + 1}/{queue_length}<br>"
+                    f"Order ID: {order['id']}<br>"
+                    f"Size: {order['size']:,}<br>"
+                    f"Time: {order['time']:.2f}s"
+                )
 
-        fig.add_trace(
-            go.Bar(
-                x=ask_sizes_list,
-                y=ask_prices_list,
-                orientation="h",
-                name="Asks",
-                marker=dict(color="rgba(255, 50, 50, 0.7)"),
-                hovertemplate="%{customdata}<extra></extra>",
-                customdata=ask_hover_text,
-            )
-        )
+                fig.add_trace(
+                    go.Bar(
+                        x=[order["size"]],
+                        y=[price],
+                        base=[cumulative_size],
+                        orientation="h",
+                        name="Asks" if queue_idx == 0 else None,
+                        marker=dict(color=color),
+                        hovertemplate="%{customdata}<extra></extra>",
+                        customdata=[hover_text],
+                        legendgroup="asks",
+                        showlegend=queue_idx == 0,
+                    )
+                )
+                cumulative_size += order["size"]
 
     max_size = 0
     if bid_levels:
@@ -127,7 +168,7 @@ def plot_order_book_depth_with_queue(
         )
 
     fig.update_layout(
-        title="Order Book Depth (Aggregated)",
+        title="Order Book Depth by Queue Position",
         xaxis_title="Shares",
         yaxis_title="Price ($)",
         barmode="overlay",
