@@ -48,6 +48,10 @@ jobs:
           git filter-repo --path LOBSTER_SampleFile_MSFT_2012-06-21_10 --invert-paths --force
           git filter-repo --path LOBSTER_SampleFile_SPY_2012-06-21_50 --invert-paths --force
 
+          cp README_HF.md README.md
+          git add README.md
+          git commit -m "Configure HuggingFace Space" || true
+
           git remote add hf https://HF_USER:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME
 
           git push hf main:main --force
