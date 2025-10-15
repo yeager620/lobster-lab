@@ -1,7 +1,7 @@
 import streamlit as st
 from pathlib import Path
 from lobster_parsing import read_lobster
-from typing import Tuple, Any
+from typing import Tuple, Any, Iterable
 import os
 from datetime import datetime, timedelta
 import zoneinfo
@@ -15,6 +15,64 @@ USE_HUGGINGFACE = bool(HF_REPO_ID)
 
 if USE_HUGGINGFACE:
     from huggingface_hub import hf_hub_download
+
+
+_GLOBAL_STYLE = """
+<style>
+/* Establish responsive typography that scales with viewport width */
+:root {
+    --lobster-h1: clamp(2.0rem, 2.4vw + 0.8rem, 3.2rem);
+    --lobster-h2: clamp(1.6rem, 1.9vw + 0.6rem, 2.4rem);
+    --lobster-h3: clamp(1.35rem, 1.4vw + 0.55rem, 1.9rem);
+    --lobster-text: clamp(0.95rem, 0.95vw + 0.55rem, 1.1rem);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+    margin-bottom: 0.75rem !important;
+}
+
+h1 { font-size: var(--lobster-h1) !important; }
+h2 { font-size: var(--lobster-h2) !important; }
+h3 { font-size: var(--lobster-h3) !important; }
+p, li, span, label {
+    font-size: var(--lobster-text) !important;
+    line-height: 1.5 !important;
+}
+
+/* Allow sidebar text to wrap gracefully */
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] label {
+    white-space: normal !important;
+}
+
+/* Harmonise metric widgets so long values do not overflow */
+[data-testid="stMetricValue"] {
+    font-size: clamp(1.1rem, 1.4vw + 0.6rem, 1.8rem) !important;
+    line-height: 1.15 !important;
+    word-break: break-word !important;
+}
+
+[data-testid="stMetricLabel"] {
+    font-size: clamp(0.75rem, 0.8vw + 0.45rem, 1.05rem) !important;
+    white-space: normal !important;
+    line-height: 1.2 !important;
+}
+
+/* Reduce excess spacing inside Streamlit containers */
+section[data-testid="stHorizontalBlock"] > div {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+}
+</style>
+"""
+
+
+def apply_global_styles() -> None:
+    """Inject a single CSS block that keeps typography readable and responsive."""
+
+    st.markdown(_GLOBAL_STYLE, unsafe_allow_html=True)
 
 
 LOBSTER_DATASETS = {
@@ -51,6 +109,27 @@ def get_dataset_date(ticker_name: str) -> str:
         if ticker in ticker_name:
             return info["date"]
     return "2012-06-21"  # Default fallback
+
+
+def render_metrics_grid(
+    metrics: Iterable[Tuple[str, Any]],
+    *,
+    columns: int = 3,
+) -> None:
+    """Render a set of metric widgets using a responsive grid layout."""
+
+    items = list(metrics)
+    if not items:
+        return
+
+    columns = max(1, columns)
+
+    for start in range(0, len(items), columns):
+        row_items = items[start : start + columns]
+        row_columns = st.columns(len(row_items))
+        for col, (label, value) in zip(row_columns, row_items):
+            with col:
+                st.metric(label, value)
 
 
 def discover_local_datasets() -> dict:

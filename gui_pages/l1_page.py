@@ -1,7 +1,14 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from .shared import init_session_state, load_ticker_data, seconds_to_eastern_time, get_dataset_date
+from .shared import (
+    init_session_state,
+    load_ticker_data,
+    seconds_to_eastern_time,
+    get_dataset_date,
+    apply_global_styles,
+    render_metrics_grid,
+)
 
 
 def create_candlestick_data(
@@ -231,6 +238,7 @@ def plot_volume_profile(
 
 
 def show():
+    apply_global_styles()
     st.title("L1")
     st.markdown("**Price action, candlesticks, and volume analysis**")
 
@@ -288,19 +296,20 @@ def show():
 
     st.markdown(f"### Event #{current_idx:,} / {len(messages):,}")
 
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        best_bid = current_ob["bid_price_1"] / 10000.0
-        st.metric("Best Bid", f"${best_bid:.4f}")
-    with col2:
-        best_ask = current_ob["ask_price_1"] / 10000.0
-        st.metric("Best Ask", f"${best_ask:.4f}")
-    with col3:
-        spread = best_ask - best_bid
-        st.metric("Spread", f"${spread:.4f}")
-    with col4:
-        mid = (best_bid + best_ask) / 2
-        st.metric("Mid Price", f"${mid:.4f}")
+    best_bid = current_ob["bid_price_1"] / 10000.0
+    best_ask = current_ob["ask_price_1"] / 10000.0
+    spread = best_ask - best_bid
+    mid = (best_bid + best_ask) / 2
+
+    render_metrics_grid(
+        [
+            ("Best Bid", f"${best_bid:.4f}"),
+            ("Best Ask", f"${best_ask:.4f}"),
+            ("Spread", f"${spread:.4f}"),
+            ("Mid Price", f"${mid:.4f}"),
+        ],
+        columns=2,
+    )
 
     st.markdown("---")
 

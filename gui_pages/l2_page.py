@@ -2,7 +2,14 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from typing import Optional, Tuple
-from .shared import init_session_state, load_ticker_data, seconds_to_eastern_time, get_dataset_date
+from .shared import (
+    init_session_state,
+    load_ticker_data,
+    seconds_to_eastern_time,
+    get_dataset_date,
+    apply_global_styles,
+    render_metrics_grid,
+)
 
 
 def get_orderbook_depth(
@@ -111,6 +118,7 @@ def format_message_details(msg: pd.Series, date_str: str = "2012-06-21") -> dict
 
 
 def show():
+    apply_global_styles()
     st.title("L2")
     st.markdown("**L2 Order Book Visualizer: Aggregated liquidity by price**")
 
@@ -292,10 +300,7 @@ def show():
     date_str = get_dataset_date(st.session_state.selected_ticker)
     msg_details = format_message_details(current_msg, date_str)
 
-    cols = st.columns(6)
-    for i, (key, value) in enumerate(msg_details.items()):
-        with cols[i]:
-            st.metric(label=key, value=value)
+    render_metrics_grid(list(msg_details.items()), columns=3)
 
     st.markdown("---")
 
@@ -305,15 +310,15 @@ def show():
     spread = best_ask - best_bid
     mid = (best_bid + best_ask) / 2
 
-    cols = st.columns(4)
-    with cols[0]:
-        st.metric("Best Bid", f"${best_bid:.4f}")
-    with cols[1]:
-        st.metric("Best Ask", f"${best_ask:.4f}")
-    with cols[2]:
-        st.metric("Spread", f"${spread:.4f}")
-    with cols[3]:
-        st.metric("Mid Price", f"${mid:.4f}")
+    render_metrics_grid(
+        [
+            ("Best Bid", f"${best_bid:.4f}"),
+            ("Best Ask", f"${best_ask:.4f}"),
+            ("Spread", f"${spread:.4f}"),
+            ("Mid Price", f"${mid:.4f}"),
+        ],
+        columns=2,
+    )
 
     st.markdown("---")
 
