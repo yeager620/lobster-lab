@@ -1,36 +1,14 @@
-# LOBSTER Market Data Analyzer
+# LOBSTER Order Book Visualizer
 
-LOBSTER (Limit Order Book System - The Efficient Reconstructor) market data parser and visualizer.
+LOBSTER order book data parser and visualizer.
 
-Work in progress: Backtesting engine
+GUI for visualizing limit order book data with L1, L2, and L3 views.
 
 ## Setup
 
 ```bash
-git clone <repo-url>
-cd lobster
 uv sync
-
-streamlit run gui_app.py # local data
-
-streamlit run gui_app.py  # huggingface data
-
-```
-
-## Installation
-
-```bash
-uv sync
-```
-
-**Dependencies:** polars, streamlit, plotly, huggingface-hub
-
-## Usage
-
-### GUI Visualization
-
-```bash
-streamlit run gui_app.py
+uv run streamlit run gui_app.py
 ```
 
 Navigate between three views:
@@ -38,27 +16,43 @@ Navigate between three views:
 - **L2**: Aggregated depth charts by price level
 - **L3**: Individual order tracking with FIFO queue positions
 
-## HuggingFace Setup
+## Configuration
 
-**Configuration**
+### HuggingFace
 
-Create `.streamlit/secrets.toml`:
-```toml
-HF_REPO_ID = "USERNAME/lobster-data"
-```
-
-**Sync All Datasets**
-
-The `sync_datasets.py` script handles everything: creating the repository, downloading missing datasets from lobsterdata.com, uploading to HuggingFace, and generating the README.
+By default, the GUI loads from `totalorganfailure/lobster-data`. To use a different repository:
 
 ```bash
-huggingface-cli login
+export HF_REPO_ID="your-username/your-repo"
+uv run streamlit run gui_app.py
+```
 
-python sync_datasets.py --repo-id USERNAME/lobster-data
+Or create `.streamlit/secrets.toml`:
+```toml
+HF_REPO_ID = "your-username/your-repo"
+```
 
-python sync_datasets.py --repo-id USERNAME/lobster-data --dry-run  # Preview only
-python sync_datasets.py --repo-id USERNAME/lobster-data --tickers AAPL MSFT  # Specific tickers
-python sync_datasets.py --repo-id USERNAME/lobster-data --private  # Private repo
+### Local Files
+
+```bash
+export HF_REPO_ID=""
+uv run streamlit run gui_app.py
+```
+
+Local files must be in `LOBSTER_SampleFile_*` directories in the working directory
+
+## Sync Datasets to HuggingFace
+
+
+```bash
+uv run huggingface-cli login
+
+uv run python sync_datasets.py --repo-id your-username/lobster-data
+
+uv run python sync_datasets.py --repo-id your-username/lobster-data --dry-run
+uv run python sync_datasets.py --repo-id your-username/lobster-data --tickers AAPL MSFT
+uv run python sync_datasets.py --repo-id your-username/lobster-data --force-readme --keep-local
+uv run python sync_datasets.py --repo-id your-username/lobster-data --private
 ```
 
 ## Data Format
@@ -77,7 +71,3 @@ python sync_datasets.py --repo-id USERNAME/lobster-data --private  # Private rep
 For each level i: `[ask_price_i, ask_size_i, bid_price_i, bid_size_i]`
 
 Unoccupied levels: `ask_price=9999999999, bid_price=-9999999999, size=0`
-
-## Sample Data
-
-Sample datasets are available at [lobsterdata.com/info/DataSamples.php](https://lobsterdata.com/info/DataSamples.php):

@@ -1,5 +1,3 @@
-"""L3 (Order-Level) Order Book Visualization Page"""
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -9,23 +7,6 @@ from .shared import init_session_state, load_ticker_data
 
 
 def reconstruct_order_book_state(messages: pd.DataFrame, up_to_idx: int) -> Dict:
-    """
-    Reconstruct L3 order book state from LOBSTER messages.
-
-    LOBSTER message types:
-    1 = Submission of new limit order
-    2 = Cancellation (partial deletion)
-    3 = Deletion (complete cancellation)
-    4 = Execution of visible limit order
-    5 = Execution of hidden limit order
-    7 = Trading halt indicator
-
-    Returns dict with structure:
-    {
-        'bids': {order_id: {'price': float, 'size': int, 'time': float}},
-        'asks': {order_id: {'price': float, 'size': int, 'time': float}}
-    }
-    """
     order_book = {"bids": {}, "asks": {}}
 
     for i in range(min(up_to_idx + 1, len(messages))):
@@ -33,28 +14,28 @@ def reconstruct_order_book_state(messages: pd.DataFrame, up_to_idx: int) -> Dict
         msg_type = int(msg["type"])
         order_id = int(msg["order_id"])
         size = int(msg["size"])
-        price = msg["price"] / 10000.0  # Convert to dollars
+        price = msg["price"] / 10000.0
         direction = int(msg["direction"])
         time = msg["time"]
 
         side = "bids" if direction == 1 else "asks"
 
-        if msg_type == 1:  # New order
+        if msg_type == 1:
             order_book[side][order_id] = {
                 "price": price,
                 "size": size,
                 "time": time,
                 "initial_size": size,
             }
-        elif msg_type == 2:  # Partial cancellation
+        elif msg_type == 2:
             if order_id in order_book[side]:
                 order_book[side][order_id]["size"] -= size
                 if order_book[side][order_id]["size"] <= 0:
                     del order_book[side][order_id]
-        elif msg_type == 3:  # Deletion
+        elif msg_type == 3:
             if order_id in order_book[side]:
                 del order_book[side][order_id]
-        elif msg_type in [4, 5]:  # Execution
+        elif msg_type in [4, 5]:
             if order_id in order_book[side]:
                 order_book[side][order_id]["size"] -= size
                 if order_book[side][order_id]["size"] <= 0:
@@ -66,30 +47,23 @@ def reconstruct_order_book_state(messages: pd.DataFrame, up_to_idx: int) -> Dict
 def plot_order_book_depth_with_queue(
     order_book: Dict, levels: int = 10
 ) -> Tuple[go.Figure, List, List]:
-    """
-    Create aggregated order book depth chart (like L2) and return order details for table display.
-    """
-    # Process bids (sorted high to low)
     bid_prices = defaultdict(list)
     for order_id, order in order_book["bids"].items():
         bid_prices[order["price"]].append(
             {"id": order_id, "size": order["size"], "time": order["time"]}
         )
 
-    # Process asks (sorted low to high)
     ask_prices = defaultdict(list)
     for order_id, order in order_book["asks"].items():
         ask_prices[order["price"]].append(
             {"id": order_id, "size": order["size"], "time": order["time"]}
         )
 
-    # Get top N price levels
     bid_levels = sorted(bid_prices.items(), key=lambda x: x[0], reverse=True)[:levels]
     ask_levels = sorted(ask_prices.items(), key=lambda x: x[0])[:levels]
 
     fig = go.Figure()
 
-    # Prepare bid data (all bids in one trace)
     if bid_levels:
         bid_prices_list = []
         bid_sizes_list = []
@@ -116,7 +90,6 @@ def plot_order_book_depth_with_queue(
             )
         )
 
-    # Prepare ask data (all asks in one trace)
     if ask_levels:
         ask_prices_list = []
         ask_sizes_list = []
@@ -143,7 +116,6 @@ def plot_order_book_depth_with_queue(
             )
         )
 
-    # Calculate appropriate x-axis range
     max_size = 0
     if bid_levels:
         max_size = max(
@@ -171,12 +143,8 @@ def plot_order_book_depth_with_queue(
 
 
 def format_order_queue_table(price_levels: List, side: str) -> pd.DataFrame:
-    """
-    Format order queue data into a table showing queue positions.
-    """
     rows = []
     for price, orders in price_levels:
-        # Sort by time (FIFO)
         orders_sorted = sorted(orders, key=lambda x: x["time"])
         for i, order in enumerate(orders_sorted):
             rows.append(
@@ -193,7 +161,6 @@ def format_order_queue_table(price_levels: List, side: str) -> pd.DataFrame:
 
 
 def plot_order_size_distribution(order_book: Dict) -> go.Figure:
-    """Show distribution of order sizes in the current book."""
     bid_sizes = [order["size"] for order in order_book["bids"].values()]
     ask_sizes = [order["size"] for order in order_book["asks"].values()]
 
@@ -223,7 +190,6 @@ def plot_order_size_distribution(order_book: Dict) -> go.Figure:
 
 
 def plot_order_timeline(messages: pd.DataFrame, order_id: int) -> go.Figure:
-    """Track a specific order's lifecycle through time."""
     order_msgs = messages[messages["order_id"] == order_id].copy()
 
     if order_msgs.empty:
@@ -240,7 +206,6 @@ def plot_order_timeline(messages: pd.DataFrame, order_id: int) -> go.Figure:
 
     order_msgs = order_msgs.sort_values("time")
 
-    # Map message types to events
     event_map = {
         1: "Submitted",
         2: "Partial Cancel",
@@ -256,7 +221,6 @@ def plot_order_timeline(messages: pd.DataFrame, order_id: int) -> go.Figure:
 
     fig = go.Figure()
 
-    # Timeline with events
     fig.add_trace(
         go.Scatter(
             x=times,
@@ -284,8 +248,6 @@ def plot_order_timeline(messages: pd.DataFrame, order_id: int) -> go.Figure:
 
 
 def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100) -> go.Figure:
-    """Show order arrival rate over time (rolling window)."""
-    # Count new orders (type 1) in rolling windows
     new_orders = messages[messages["type"] == 1].copy()
 
     if len(new_orders) < window:
@@ -300,7 +262,6 @@ def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100) -> go.Figure
         )
         return fig
 
-    # Calculate rolling rate
     times = []
     rates = []
 
@@ -308,7 +269,7 @@ def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100) -> go.Figure
         time_window = new_orders.iloc[i - window : i]
         time_diff = time_window["time"].iloc[-1] - time_window["time"].iloc[0]
         if time_diff > 0:
-            rate = window / time_diff  # orders per second
+            rate = window / time_diff
             times.append(time_window["time"].iloc[-1])
             rates.append(rate)
 
@@ -335,16 +296,12 @@ def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100) -> go.Figure
 
 
 def show():
-    """Render the L3 visualization page."""
     st.title("L3 Order Book Visualizer")
     st.markdown(
         "**Level 3 (Order-level) Visualization** - Individual order tracking and queue analysis"
     )
 
-    # Initialize session state
     init_session_state()
-
-    # Load data
     messages, orderbook, available_tickers = load_ticker_data()
 
     if messages is None:
@@ -353,7 +310,6 @@ def show():
         )
         return
 
-    # Playback controls
     st.sidebar.header("Playback Controls")
     max_idx = len(messages) - 1
 
@@ -499,7 +455,6 @@ def show():
     current_idx = st.session_state.current_idx
     current_msg = messages.iloc[current_idx]
 
-    # Display current message info
     message_types = {
         1: ("New Limit Order", "blue"),
         2: ("Partial Cancellation", "orange"),
@@ -515,11 +470,9 @@ def show():
     st.markdown(f"### Event #{current_idx:,} / {len(messages):,}")
     st.markdown(f"**Event Type:** :{msg_type_color}[{msg_type_text}]")
 
-    # Reconstruct order book state up to current index
     with st.spinner("Reconstructing order book state..."):
         order_book = reconstruct_order_book_state(messages, current_idx)
 
-    # Display current state summary
     st.markdown("---")
     st.markdown("### Current Order Book State")
     col1, col2, col3, col4 = st.columns(4)
@@ -536,14 +489,12 @@ def show():
 
     st.markdown("---")
 
-    # Visualizations
     st.markdown("### Order Book Depth with Queue Details")
     fig_depth, bid_levels, ask_levels = plot_order_book_depth_with_queue(
         order_book, levels=display_levels
     )
     st.plotly_chart(fig_depth, use_container_width=True, key=f"l3_depth_{current_idx}")
 
-    # Show queue position tables
     st.markdown("#### Order Queue Details")
     col1, col2 = st.columns(2)
 
@@ -579,7 +530,6 @@ def show():
 
     st.markdown("---")
 
-    # Order tracker
     st.markdown("### Individual Order Tracker")
     order_id_input = st.number_input(
         "Enter Order ID to track", min_value=0, value=0, step=1, key="l3_order_id"
@@ -589,7 +539,6 @@ def show():
         fig_timeline = plot_order_timeline(messages, order_id_input)
         st.plotly_chart(fig_timeline, use_container_width=True)
 
-    # Raw order book view
     with st.expander("View Complete Order Book (L3)"):
         col1, col2 = st.columns(2)
         with col1:

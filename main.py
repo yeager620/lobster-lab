@@ -5,7 +5,7 @@ from backtesting import MarketMakerParams, run_backtest_multiple
 
 SAMPLE_FILES = {
     "AAPL": (
-        "LOBSTER_SampleFile_AAPL_2012-06-21_50/AAPL_2012-06-21_34200000_37800000_message_50.csv",
+        "LOBSTER_SampleFile_AAPL_ 2012-06-21_50/AAPL_2012-06-21_34200000_37800000_message_50.csv",
         "LOBSTER_SampleFile_AAPL_2012-06-21_50/AAPL_2012-06-21_34200000_37800000_orderbook_50.csv",
     ),
     "MSFT": (
@@ -69,7 +69,6 @@ def main() -> None:
     if not (1 <= len(tickers) <= 4):
         raise SystemExit("Please specify between 1 and 4 tickers")
 
-    # Validate available sample data
     missing = [t for t in tickers if t not in SAMPLE_FILES]
     if missing:
         raise SystemExit(
@@ -84,12 +83,10 @@ def main() -> None:
         impact_bps=args.impact_bps,
     )
 
-    # Subset mapping for selected tickers
     data_map = {t: SAMPLE_FILES[t] for t in tickers}
 
     results, agg = run_backtest_multiple(tickers, data_map, params)
 
-    # Pretty print results
     def fmt_usd(x: float) -> str:
         return f"${x:,.2f}"
 

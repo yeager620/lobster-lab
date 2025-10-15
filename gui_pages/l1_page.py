@@ -1,5 +1,3 @@
-"""L1 (Price-Level) Time Series Visualization Page"""
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -9,12 +7,8 @@ from .shared import init_session_state, load_ticker_data
 def create_candlestick_data(
     messages: pd.DataFrame, orderbook: pd.DataFrame, window: int = 100
 ):
-    """
-    Create OHLC candlestick data from mid-price using rolling window.
-    """
     candles = []
 
-    # Calculate mid-prices for all events
     mid_prices = []
     times = []
 
@@ -29,7 +23,6 @@ def create_candlestick_data(
             mid_prices.append(mid)
             times.append(msg["time"])
 
-    # Create candlesticks from rolling windows
     for i in range(0, len(mid_prices) - window, window):
         window_prices = mid_prices[i : i + window]
         window_times = times[i : i + window]
@@ -54,14 +47,12 @@ def plot_price_candlestick(
     current_idx: int,
     window_size: int = 1000,
 ) -> go.Figure:
-    """Create candlestick chart with current position marker."""
     start_idx = max(0, current_idx - window_size)
     end_idx = min(len(messages), current_idx + window_size // 4)
 
     msg_window = messages.iloc[start_idx:end_idx]
     ob_window = orderbook.iloc[start_idx:end_idx]
 
-    # Get mid prices for candlestick
     mid_prices = []
     times = []
     for i in range(len(ob_window)):
@@ -73,13 +64,11 @@ def plot_price_candlestick(
             mid_prices.append(mid)
             times.append(msg_window.iloc[i]["time"])
 
-    # Create candlestick data
-    candle_window = 50  # Create candles every 50 events
+    candle_window = 50
     candle_data = create_candlestick_data(msg_window, ob_window, window=candle_window)
 
     fig = go.Figure()
 
-    # Add candlestick
     if not candle_data.empty:
         fig.add_trace(
             go.Candlestick(
@@ -94,7 +83,6 @@ def plot_price_candlestick(
             )
         )
 
-    # Add execution markers
     exec_events = msg_window[msg_window["type"].isin([4, 5])]
     if not exec_events.empty:
         exec_prices = exec_events["price"] / 10000.0
@@ -109,7 +97,6 @@ def plot_price_candlestick(
             )
         )
 
-    # Add current position marker
     if current_idx < len(messages):
         current_msg = messages.iloc[current_idx]
         current_ob = orderbook.iloc[current_idx]
@@ -151,15 +138,11 @@ def plot_volume_profile(
     current_idx: int,
     window_size: int = 1000,
 ) -> go.Figure:
-    """
-    Create a volume profile showing traded volume at each price level.
-    """
     start_idx = max(0, current_idx - window_size)
     end_idx = min(len(messages), current_idx + 1)
 
     msg_window = messages.iloc[start_idx:end_idx]
 
-    # Get execution events
     exec_events = msg_window[msg_window["type"].isin([4, 5])].copy()
 
     if exec_events.empty:
@@ -174,15 +157,12 @@ def plot_volume_profile(
         )
         return fig
 
-    # Calculate price and volume
     exec_events["price_level"] = (exec_events["price"] / 10000.0).round(2)
 
-    # Aggregate volume by price
     volume_profile = exec_events.groupby("price_level")["size"].sum().reset_index()
     volume_profile.columns = ["price", "volume"]
     volume_profile = volume_profile.sort_values("price")
 
-    # Separate by direction (buy vs sell)
     exec_events_buy = exec_events[exec_events["direction"] == 1]
     exec_events_sell = exec_events[exec_events["direction"] == -1]
 
@@ -191,7 +171,6 @@ def plot_volume_profile(
 
     fig = go.Figure()
 
-    # Add buy volume
     if not buy_profile.empty:
         fig.add_trace(
             go.Bar(
@@ -205,7 +184,6 @@ def plot_volume_profile(
             )
         )
 
-    # Add sell volume (negative for visual separation)
     if not sell_profile.empty:
         fig.add_trace(
             go.Bar(
@@ -219,7 +197,6 @@ def plot_volume_profile(
             )
         )
 
-    # Mark current price
     if current_idx < len(messages):
         current_ob = orderbook.iloc[current_idx]
         current_mid = (current_ob["ask_price_1"] + current_ob["bid_price_1"]) / 20000.0
@@ -247,16 +224,13 @@ def plot_volume_profile(
 
 
 def show():
-    """Render the L1 visualization page."""
     st.title("L1 Price Visualization")
     st.markdown(
         "**Level 1 (Price Time Series)** - Price action, candlesticks, and volume analysis"
     )
 
-    # Initialize session state
     init_session_state()
 
-    # Load data
     messages, orderbook, available_tickers = load_ticker_data()
 
     if messages is None:
@@ -265,7 +239,6 @@ def show():
         )
         return
 
-    # Sidebar controls
     st.sidebar.header("Visualization Settings")
 
     chart_window = st.sidebar.slider(
@@ -292,7 +265,6 @@ def show():
     )
     st.session_state.current_idx = current_idx
 
-    # Quick jump buttons
     jump_col1, jump_col2, jump_col3 = st.sidebar.columns(3)
     with jump_col1:
         if st.button("-1000", key="l1_jump_back_1000", use_container_width=True):
@@ -307,11 +279,8 @@ def show():
             st.session_state.current_idx = min(max_idx, current_idx + 1000)
             st.rerun()
 
-    # Main content
-    current_msg = messages.iloc[current_idx]
     current_ob = orderbook.iloc[current_idx]
 
-    # Current state info
     st.markdown(f"### Event #{current_idx:,} / {len(messages):,}")
 
     col1, col2, col3, col4 = st.columns(4)
@@ -330,7 +299,6 @@ def show():
 
     st.markdown("---")
 
-    # Candlestick chart
     st.markdown("### Price Candlestick Chart")
     fig_candle = plot_price_candlestick(
         messages, orderbook, current_idx, window_size=chart_window
@@ -341,7 +309,6 @@ def show():
 
     st.markdown("---")
 
-    # Volume profile
     st.markdown("### Volume Profile")
     st.markdown("*Distribution of executed volume by price level*")
     fig_volume = plot_volume_profile(

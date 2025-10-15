@@ -57,12 +57,10 @@ def _get_value(row: Any, col: str) -> Any:
 
 
 def _side_and_exec(message_row: Any) -> Optional[str]:
-    mtype = int(_get_value(message_row, "type"))  # 4 visible exec, 5 hidden exec
+    mtype = int(_get_value(message_row, "type"))
     if mtype not in (4, 5):
         return None
-    direction = int(
-        _get_value(message_row, "direction")
-    )  # 1 buy limit order executed -> bid side; -1 sell limit -> ask side
+    direction = int(_get_value(message_row, "direction"))
     if direction == 1:
         return "bid"
     elif direction == -1:
@@ -71,10 +69,10 @@ def _side_and_exec(message_row: Any) -> Optional[str]:
 
 
 def _best_quotes(orderbook_row: Any) -> Tuple[int, int, int, int]:
-    ask_px = int(_get_value(orderbook_row, "ask_price_1"))  # dollars*10000
-    ask_sz = int(_get_value(orderbook_row, "ask_size_1"))  # shares
-    bid_px = int(_get_value(orderbook_row, "bid_price_1"))  # dollars*10000
-    bid_sz = int(_get_value(orderbook_row, "bid_size_1"))  # shares
+    ask_px = int(_get_value(orderbook_row, "ask_price_1"))
+    ask_sz = int(_get_value(orderbook_row, "ask_size_1"))
+    bid_px = int(_get_value(orderbook_row, "bid_price_1"))
+    bid_sz = int(_get_value(orderbook_row, "bid_size_1"))
     return ask_px, ask_sz, bid_px, bid_sz
 
 
