@@ -89,7 +89,6 @@ def plot_orderbook(
 
 
 def format_message_details(msg: pd.Series) -> dict:
-    """Format message data for display."""
     message_types = {
         1: "New Order",
         2: "Cancel",
@@ -112,10 +111,9 @@ def format_message_details(msg: pd.Series) -> dict:
 
 
 def show():
-    """Render the L2 visualization page."""
-    st.title("L2 Order Book Visualizer")
+    st.title("L2")
     st.markdown(
-        "**Level 2 (Price-Level) Visualization** - Aggregated liquidity by price"
+        "**L2 Order Book Visualizer: Aggregated liquidity by price"
     )
 
     init_session_state()

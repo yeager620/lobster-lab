@@ -224,9 +224,9 @@ def plot_volume_profile(
 
 
 def show():
-    st.title("L1 Price Visualization")
+    st.title("L1")
     st.markdown(
-        "**Level 1 (Price Time Series)** - Price action, candlesticks, and volume analysis"
+        "**Price action, candlesticks, and volume analysis"
     )
 
     init_session_state()
