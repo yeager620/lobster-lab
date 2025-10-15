@@ -78,7 +78,9 @@ def get_hf_datasets(repo_id: str) -> Set[Tuple[str, int]]:
             else:
                 ticker, levels = key
                 missing = [k for k, v in files_present.items() if not v]
-                print(f"Warning: {ticker} ({levels} levels) missing {', '.join(missing)} file(s)")
+                print(
+                    f"Warning: {ticker} ({levels} levels) missing {', '.join(missing)} file(s)"
+                )
 
         return hf_datasets
     except Exception as e:

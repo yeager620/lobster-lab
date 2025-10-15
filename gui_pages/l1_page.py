@@ -225,9 +225,7 @@ def plot_volume_profile(
 
 def show():
     st.title("L1")
-    st.markdown(
-        "**Price action, candlesticks, and volume analysis**"
-    )
+    st.markdown("**Price action, candlesticks, and volume analysis**")
 
     init_session_state()
 
