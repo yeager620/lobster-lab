@@ -21,32 +21,33 @@ jobs:
         with:
           python-version: '3.13'
 
-      # Deploy to Hugging Face Spaces
       - name: Push to Hugging Face Spaces
+        if: ${{ secrets.HF_TOKEN != '' && secrets.HF_SPACE_NAME != '' }}
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
 
-          # Add HF remote if it doesn't exist
-          git remote add hf https://huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }} || true
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE_NAME" ]; then
+            echo "skipping HuggingFace deployment ; cant find secrets"
+            echo "necessary secrets: HF_TOKEN, HF_SPACE_NAME"
+            exit 0
+          fi
 
-          # Push to HF Spaces
-          git push https://user:$HF_TOKEN@huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }} main:main --force
+          echo "deploying to HF space: $HF_SPACE_NAME"
+          git push --force https://HF_USER:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME main:main
 
-      # Trigger Streamlit Cloud redeploy
       - name: Trigger Streamlit Cloud Deployment
         env:
           STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
         run: |
-          echo "Streamlit Cloud will auto-deploy from this push to main branch"
-          echo "App URL: $STREAMLIT_APP_URL"
-          # Streamlit Cloud automatically deploys when main branch is updated
-          # No API call needed - it monitors the GitHub repo
+          echo "streamlit cloud will auto-deploy to main"
+          echo "url: $STREAMLIT_APP_URL"
 
       - name: Deployment Summary
         run: |
-          echo "✅ Deployment initiated"
-          echo "📦 Hugging Face Spaces: https://huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }}"
-          echo "🎈 Streamlit Cloud: ${{ secrets.STREAMLIT_APP_URL }}"
+          echo "deployment started"
+          echo "hf spaces: https://huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }}"
+          echo "streamlit: ${{ secrets.STREAMLIT_APP_URL }}"
