@@ -1,8 +1,8 @@
 # LOBSTER Order Book Visualizer
 
-LOBSTER order book data parser and visualizer.
+LOBSTER order book data visualizer
 
-GUI for visualizing limit order book data with L1, L2, and L3 views.
+GUI for visualizing limit order book data with L1, L2, and L3 views
 
 ## Setup
 
@@ -11,10 +11,10 @@ uv sync
 uv run streamlit run gui_app.py
 ```
 
-Navigate between three views:
-- **L1**: Price candlesticks, volume profiles, execution markers
-- **L2**: Aggregated depth charts by price level
-- **L3**: Individual order tracking with FIFO queue positions
+Three pages:
+- **L1**: Price time series, candlesticks, volume profiles
+- **L2**: Order book with liquidity aggregated by price
+- **L3**: Market by order with FIFO queue positions
 
 ## Configuration
 
@@ -39,7 +39,7 @@ export HF_REPO_ID=""
 uv run streamlit run gui_app.py
 ```
 
-Local files must be in `LOBSTER_SampleFile_*` directories in the working directory
+Local files must be in `./LOBSTER_SampleFile_*` directories
 
 ## Sync Datasets to HuggingFace
 
