@@ -102,12 +102,8 @@ def plot_order_book_depth_with_queue(
 
     fig = go.Figure()
 
-    # Bid side - aggregate bars with details in hover
+    # Bid side - aggregate bars with individual order segments
     if bid_levels:
-        bid_prices_list = []
-        bid_sizes_list = []
-        bid_hover_list = []
-
         for price, orders in bid_levels:
             orders_sorted = sorted(orders, key=lambda x: x["time"])
             total_size = sum(o["size"] for o in orders_sorted)
@@ -127,33 +123,36 @@ def plot_order_book_depth_with_queue(
             if len(orders_sorted) > 5:
                 hover_lines.append(f"  ... and {len(orders_sorted)-5} more")
 
-            bid_prices_list.append(price)
-            bid_sizes_list.append(total_size)
-            bid_hover_list.append("<br>".join(hover_lines))
-
-        fig.add_trace(
-            go.Bar(
-                x=bid_sizes_list,
-                y=bid_prices_list,
-                orientation="h",
-                name="Bids",
-                marker=dict(
-                    color=bid_sizes_list,
-                    colorscale="Greens",
-                    showscale=False,
-                    line=dict(color="darkgreen", width=1)
-                ),
-                hovertemplate="%{customdata}<extra></extra>",
-                customdata=bid_hover_list,
+            # Add main bar for total size
+            fig.add_trace(
+                go.Bar(
+                    x=[total_size],
+                    y=[price],
+                    orientation="h",
+                    name="Bids",
+                    marker=dict(color="rgba(0, 180, 0, 0.7)"),
+                    hovertemplate="%{customdata}<extra></extra>",
+                    customdata=["<br>".join(hover_lines)],
+                    showlegend=(price == bid_levels[0][0]),  # Only show legend once
+                    legendgroup="bids",
+                )
             )
-        )
 
-    # Ask side - aggregate bars with details in hover
+            # Add vertical lines to mark individual order boundaries
+            cumulative = 0
+            for order in orders_sorted:
+                cumulative += order["size"]
+                if cumulative < total_size:  # Don't draw line at the very end
+                    fig.add_shape(
+                        type="line",
+                        x0=cumulative, x1=cumulative,
+                        y0=price - 0.003, y1=price + 0.003,  # Small vertical line
+                        line=dict(color="rgba(255, 255, 255, 0.6)", width=2),
+                        layer="above"
+                    )
+
+    # Ask side - aggregate bars with individual order segments
     if ask_levels:
-        ask_prices_list = []
-        ask_sizes_list = []
-        ask_hover_list = []
-
         for price, orders in ask_levels:
             orders_sorted = sorted(orders, key=lambda x: x["time"])
             total_size = sum(o["size"] for o in orders_sorted)
@@ -173,26 +172,33 @@ def plot_order_book_depth_with_queue(
             if len(orders_sorted) > 5:
                 hover_lines.append(f"  ... and {len(orders_sorted)-5} more")
 
-            ask_prices_list.append(price)
-            ask_sizes_list.append(total_size)
-            ask_hover_list.append("<br>".join(hover_lines))
-
-        fig.add_trace(
-            go.Bar(
-                x=ask_sizes_list,
-                y=ask_prices_list,
-                orientation="h",
-                name="Asks",
-                marker=dict(
-                    color=ask_sizes_list,
-                    colorscale="Reds",
-                    showscale=False,
-                    line=dict(color="darkred", width=1)
-                ),
-                hovertemplate="%{customdata}<extra></extra>",
-                customdata=ask_hover_list,
+            # Add main bar for total size
+            fig.add_trace(
+                go.Bar(
+                    x=[total_size],
+                    y=[price],
+                    orientation="h",
+                    name="Asks",
+                    marker=dict(color="rgba(255, 50, 50, 0.7)"),
+                    hovertemplate="%{customdata}<extra></extra>",
+                    customdata=["<br>".join(hover_lines)],
+                    showlegend=(price == ask_levels[0][0]),  # Only show legend once
+                    legendgroup="asks",
+                )
             )
-        )
+
+            # Add vertical lines to mark individual order boundaries
+            cumulative = 0
+            for order in orders_sorted:
+                cumulative += order["size"]
+                if cumulative < total_size:  # Don't draw line at the very end
+                    fig.add_shape(
+                        type="line",
+                        x0=cumulative, x1=cumulative,
+                        y0=price - 0.003, y1=price + 0.003,  # Small vertical line
+                        line=dict(color="rgba(255, 255, 255, 0.6)", width=2),
+                        layer="above"
+                    )
 
     # Calculate reasonable x-axis range
     max_size = 0
@@ -202,31 +208,14 @@ def plot_order_book_depth_with_queue(
         max_size = max(max_size, max(sum(o["size"] for o in orders) for _, orders in ask_levels))
 
     fig.update_layout(
-        title="Order Book Depth (Aggregated by Price Level)",
-        xaxis_title="Total Shares at Price Level",
+        title="Order Book Depth",
+        xaxis_title="Shares",
         yaxis_title="Price ($)",
         barmode="overlay",
-        height=700,
-        hovermode="y unified",
+        height=500,
+        hovermode="closest",
         showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
-        margin=dict(l=90, r=40, t=80, b=60),
-        xaxis=dict(
-            range=[0, max_size * 1.15] if max_size > 0 else [0, 100],
-            gridcolor="lightgray",
-            gridwidth=0.5,
-        ),
-        yaxis=dict(
-            gridcolor="lightgray",
-            gridwidth=0.5,
-        ),
-        plot_bgcolor="white",
+        margin=dict(l=80, r=80, t=60, b=60),
     )
 
     return fig, bid_levels, ask_levels
