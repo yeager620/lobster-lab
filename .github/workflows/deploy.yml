@@ -30,12 +30,12 @@ jobs:
           git config --global user.name "github-actions[bot]"
 
           if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE_NAME" ]; then
-            echo "Skipping HuggingFace deployment - secrets not configured"
-            echo "To enable: Add HF_TOKEN and HF_SPACE_NAME to repository secrets"
+            echo "HuggingFace deployment failed: cant find secrets"
+            echo "Add HF_TOKEN and HF_SPACE_NAME to repository secrets"
             exit 0
           fi
 
-          echo "Deploying to HuggingFace Space: $HF_SPACE_NAME"
+          echo "Deploying to HF Space: $HF_SPACE_NAME"
 
           pip install git-filter-repo
 
@@ -68,6 +68,6 @@ jobs:
 
       - name: Deployment Summary
         run: |
-          echo "Deployment initiated"
-          echo "Hugging Face Spaces: https://huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }}"
-          echo "Streamlit Cloud: ${{ secrets.STREAMLIT_APP_URL }}"
+          echo "Deployment started"
+          echo "HF Spaces: https://huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }}"
+          echo "Streamlit: ${{ secrets.STREAMLIT_APP_URL }}"
