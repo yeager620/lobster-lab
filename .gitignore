@@ -1,11 +1,16 @@
-# Python-generated files
-__pycache__/
+*__pycache__
+*__pycache/*
 *.py[oc]
-build/
-dist/
-wheels/
+*build/
+*dist/
+*wheels/
 *.egg-info
 
-# Virtual environments
-.venv
+*.venv
 *.idea/
+
+*.env
+
+*.streamlit
+
+*.DS_Store
