@@ -8,7 +8,7 @@ sdk_version: "1.50.0"
 python_version: "3.13"
 app_file: gui_app.py
 pinned: false
-license: BSD-3-Clause
+license: bsd-3-clause
 ---
 
 # LOBSTER Order Book Visualizer
