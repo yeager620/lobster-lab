@@ -1,19 +1,48 @@
-*__pycache__
-*__pycache/*
-*.py[oc]
-*build/
-*dist/
-*wheels/
-*.egg-info
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
-*.venv
-*.idea/
+# Build artifacts
+build/
+dist/
+wheels/
+*.egg-info/
+*.egg
 
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
 *.env
+.env.*
+!.env.example
 
-# Allow .streamlit/config.toml but ignore secrets
+# Streamlit
 .streamlit/*
 !.streamlit/config.toml
 
-*.DS_Store
+# Data files
 LOBSTER_SampleFile_*/
+*.csv
+!scripts/*.csv
+
+# Temporary files
+*.tmp
+*.log
