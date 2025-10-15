@@ -37,11 +37,23 @@ jobs:
 
           echo "Deploying to HuggingFace Space: $HF_SPACE_NAME"
 
-          git rm -rf --cached LOBSTER_SampleFile_* 2>/dev/null || true
+          pip install git-filter-repo
 
-          git commit -m "Remove local data files for HF Space deployment" || echo "No files to remove"
+          git clone . hf-deploy --branch main
 
-          git push --force https://HF_USER:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME HEAD:main
+          cd hf-deploy
+
+          git filter-repo --path LOBSTER_SampleFile_AAPL_2012-06-21_10 --invert-paths --force
+          git filter-repo --path LOBSTER_SampleFile_GOOG_2012-06-21_10 --invert-paths --force
+          git filter-repo --path LOBSTER_SampleFile_MSFT_2012-06-21_10 --invert-paths --force
+          git filter-repo --path LOBSTER_SampleFile_SPY_2012-06-21_50 --invert-paths --force
+
+          git remote add hf https://HF_USER:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME
+
+          git push hf main:main --force
+
+          cd ..
+          rm -rf hf-deploy
 
       - name: Trigger Streamlit Cloud Deployment
         env:
