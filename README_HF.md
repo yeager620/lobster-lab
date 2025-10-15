@@ -5,9 +5,10 @@ colorFrom: red
 colorTo: blue
 sdk: streamlit
 sdk_version: "1.50.0"
+python_version: "3.13"
 app_file: gui_app.py
 pinned: false
-license: mit
+license: BSD-3-Clause
 ---
 
 # LOBSTER Order Book Visualizer
