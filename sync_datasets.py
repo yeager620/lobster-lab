@@ -181,8 +181,6 @@ def generate_readme(hf_datasets: Set[Tuple[str, int]]) -> str:
         levels_str = ", ".join(str(level) for level in levels)
         ticker_list.append(f"- **{ticker}**: {levels_str} levels")
 
-    # Generate YAML configuration for dataset viewer
-    # Create configs for each ticker-level combination
     configs = []
     for ticker in sorted(ticker_datasets.keys()):
         for level in sorted(ticker_datasets[ticker]):
@@ -197,7 +195,6 @@ def generate_readme(hf_datasets: Set[Tuple[str, int]]) -> str:
                 }
             )
 
-    # Build YAML section
     yaml_configs = []
     for config in configs:
         yaml_configs.append(f"""  - config_name: {config["name"]}
@@ -213,23 +210,17 @@ def generate_readme(hf_datasets: Set[Tuple[str, int]]) -> str:
 
 # LOBSTER Sample Data
 
-LOBSTER (Limit Order Book System) sample L3 order book data for June 21, 2012.
+LOBSTER sample L3 order book data for June 21, 2012
 
 ## Dataset Description
 
-LOBSTER provides limit order book data from NASDAQ TotalView-ITCH messages.
+LOBSTER provides limit order book data from NASDAQ TotalView-ITCH messages
 
 {chr(10).join(ticker_list)}
 
-## Configurations
-
-Each ticker/level combination has its own configuration with two splits:
-- **message**: Order book events (time-series of market events)
-- **orderbook**: Order book snapshots at each event time
-
 ## File Structure
 
-Each ticker has two CSV files:
+Each tickerlevel combination has two CSV files:
 
 1. **Message file** (`*_message_*.csv`): Order book events
    - Columns: time, event_type, order_id, size, price, direction
@@ -239,24 +230,9 @@ Each ticker has two CSV files:
    - Columns: ask_price_1, ask_size_1, bid_price_1, bid_size_1, ... (up to N levels)
    - Prices in fixed-point (multiply by 10^-4)
 
-## Usage
-
-```python
-from datasets import load_dataset
-
-# Load a specific ticker configuration
-dataset = load_dataset("your-username/lobster-sample-data", "AAPL_10levels")
-
-# Access message data
-messages = dataset["message"]
-
-# Access orderbook data
-orderbooks = dataset["orderbook"]
-```
-
 ## Source
 
-Data provided by [LOBSTER](https://lobsterdata.com/) - Limited Order Book System.
+Data provided by [LOBSTER](https://lobsterdata.com/)
 """
     return readme
 
