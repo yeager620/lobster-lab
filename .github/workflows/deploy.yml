@@ -22,7 +22,6 @@ jobs:
           python-version: '3.13'
 
       - name: Push to Hugging Face Spaces
-        if: ${{ secrets.HF_TOKEN != '' && secrets.HF_SPACE_NAME != '' }}
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
@@ -31,23 +30,23 @@ jobs:
           git config --global user.name "github-actions[bot]"
 
           if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE_NAME" ]; then
-            echo "skipping HuggingFace deployment ; cant find secrets"
-            echo "necessary secrets: HF_TOKEN, HF_SPACE_NAME"
+            echo "Skipping HuggingFace deployment - secrets not configured"
+            echo "To enable: Add HF_TOKEN and HF_SPACE_NAME to repository secrets"
             exit 0
           fi
 
-          echo "deploying to HF space: $HF_SPACE_NAME"
+          echo "Deploying to HuggingFace Space: $HF_SPACE_NAME"
           git push --force https://HF_USER:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME main:main
 
       - name: Trigger Streamlit Cloud Deployment
         env:
           STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
         run: |
-          echo "streamlit cloud will auto-deploy to main"
-          echo "url: $STREAMLIT_APP_URL"
+          echo "Streamlit Cloud will auto-deploy from main branch"
+          echo "App URL: $STREAMLIT_APP_URL"
 
       - name: Deployment Summary
         run: |
-          echo "deployment started"
-          echo "hf spaces: https://huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }}"
-          echo "streamlit: ${{ secrets.STREAMLIT_APP_URL }}"
+          echo "Deployment initiated"
+          echo "Hugging Face Spaces: https://huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }}"
+          echo "Streamlit Cloud: ${{ secrets.STREAMLIT_APP_URL }}"
