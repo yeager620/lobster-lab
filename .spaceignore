@@ -1,0 +1,7 @@
+LOBSTER_SampleFile_*/
+.git/
+.github/
+*.pyc
+__pycache__/
+.venv/
+.DS_Store

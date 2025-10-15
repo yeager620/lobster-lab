@@ -36,7 +36,12 @@ jobs:
           fi
 
           echo "Deploying to HuggingFace Space: $HF_SPACE_NAME"
-          git push --force https://HF_USER:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME main:main
+
+          git rm -rf --cached LOBSTER_SampleFile_* 2>/dev/null || true
+
+          git commit -m "Remove local data files for HF Space deployment" || echo "No files to remove"
+
+          git push --force https://HF_USER:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME HEAD:main
 
       - name: Trigger Streamlit Cloud Deployment
         env:
