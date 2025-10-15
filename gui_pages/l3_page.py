@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import plotly.colors as pc
 from typing import Dict, List, Tuple
 from collections import defaultdict
-from .shared import init_session_state, load_ticker_data
+from .shared import init_session_state, load_ticker_data, seconds_to_eastern_time, get_dataset_date
 
 
 def reconstruct_order_book_state(messages: pd.DataFrame, up_to_idx: int) -> Dict:
@@ -225,7 +225,7 @@ def plot_order_book_depth_with_queue(
     return fig, bid_levels, ask_levels
 
 
-def format_order_queue_table(price_levels: List, side: str) -> pd.DataFrame:
+def format_order_queue_table(price_levels: List, side: str, date_str: str = "2012-06-21") -> pd.DataFrame:
     rows = []
     for price, orders in price_levels:
         orders_sorted = sorted(orders, key=lambda x: x["time"])
@@ -236,7 +236,7 @@ def format_order_queue_table(price_levels: List, side: str) -> pd.DataFrame:
                     "Queue Pos": f"{i + 1}/{len(orders_sorted)}",
                     "Order ID": order["id"],
                     "Size": f"{order['size']:,}",
-                    "Time": f"{order['time']:.2f}s",
+                    "Time": seconds_to_eastern_time(order['time'], date_str),
                 }
             )
 
@@ -272,7 +272,7 @@ def plot_order_size_distribution(order_book: Dict) -> go.Figure:
     return fig
 
 
-def plot_order_timeline(messages: pd.DataFrame, order_id: int) -> go.Figure:
+def plot_order_timeline(messages: pd.DataFrame, order_id: int, date_str: str = "2012-06-21") -> go.Figure:
     order_msgs = messages[messages["order_id"] == order_id].copy()
 
     if order_msgs.empty:
@@ -299,6 +299,7 @@ def plot_order_timeline(messages: pd.DataFrame, order_id: int) -> go.Figure:
 
     events = [event_map.get(int(t), "Unknown") for t in order_msgs["type"]]
     times = order_msgs["time"].values
+    times_et = [seconds_to_eastern_time(t, date_str) for t in times]
     sizes = order_msgs["size"].values
     prices = order_msgs["price"].values / 10000.0
 
@@ -306,14 +307,14 @@ def plot_order_timeline(messages: pd.DataFrame, order_id: int) -> go.Figure:
 
     fig.add_trace(
         go.Scatter(
-            x=times,
+            x=times_et,
             y=sizes,
             mode="lines+markers",
             marker=dict(size=12, color="blue"),
             line=dict(color="blue", width=2),
             text=[
-                f"Event: {e}<br>Time: {t:.2f}s<br>Size: {s}<br>Price: ${p:.2f}"
-                for e, t, s, p in zip(events, times, sizes, prices)
+                f"Event: {e}<br>Time: {t}<br>Size: {s}<br>Price: ${p:.2f}"
+                for e, t, s, p in zip(events, times_et, sizes, prices)
             ],
             hovertemplate="%{text}<extra></extra>",
             name=f"Order {order_id}",
@@ -322,7 +323,7 @@ def plot_order_timeline(messages: pd.DataFrame, order_id: int) -> go.Figure:
 
     fig.update_layout(
         title=f"Order Lifecycle: ID {order_id}",
-        xaxis_title="Time (seconds after midnight)",
+        xaxis_title="Time (Eastern)",
         yaxis_title="Remaining Size",
         height=400,
     )
@@ -330,7 +331,7 @@ def plot_order_timeline(messages: pd.DataFrame, order_id: int) -> go.Figure:
     return fig
 
 
-def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100) -> go.Figure:
+def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100, date_str: str = "2012-06-21") -> go.Figure:
     new_orders = messages[messages["type"] == 1].copy()
 
     if len(new_orders) < window:
@@ -346,6 +347,7 @@ def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100) -> go.Figure
         return fig
 
     times = []
+    times_et = []
     rates = []
 
     for i in range(window, len(new_orders)):
@@ -353,14 +355,16 @@ def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100) -> go.Figure
         time_diff = time_window["time"].iloc[-1] - time_window["time"].iloc[0]
         if time_diff > 0:
             rate = window / time_diff
-            times.append(time_window["time"].iloc[-1])
+            time_val = time_window["time"].iloc[-1]
+            times.append(time_val)
+            times_et.append(seconds_to_eastern_time(time_val, date_str))
             rates.append(rate)
 
     fig = go.Figure()
 
     fig.add_trace(
         go.Scatter(
-            x=times,
+            x=times_et,
             y=rates,
             mode="lines",
             line=dict(color="purple", width=2),
@@ -370,7 +374,7 @@ def plot_order_flow_rate(messages: pd.DataFrame, window: int = 100) -> go.Figure
 
     fig.update_layout(
         title=f"Order Arrival Rate (Rolling Window: {window} orders)",
-        xaxis_title="Time (seconds after midnight)",
+        xaxis_title="Time (Eastern)",
         yaxis_title="Orders per Second",
         height=400,
     )
@@ -579,11 +583,12 @@ def show():
     st.plotly_chart(fig_depth, use_container_width=True, key=f"l3_depth_{current_idx}")
 
     st.markdown("#### Order Queue Details")
+    date_str = get_dataset_date(st.session_state.selected_ticker)
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown("**Bid Queue (FIFO Order)**")
-        bid_table = format_order_queue_table(bid_levels, "bid")
+        bid_table = format_order_queue_table(bid_levels, "bid", date_str)
         if not bid_table.empty:
             st.dataframe(bid_table, use_container_width=True, hide_index=True)
         else:
@@ -591,7 +596,7 @@ def show():
 
     with col2:
         st.markdown("**Ask Queue (FIFO Order)**")
-        ask_table = format_order_queue_table(ask_levels, "ask")
+        ask_table = format_order_queue_table(ask_levels, "ask", date_str)
         if not ask_table.empty:
             st.dataframe(ask_table, use_container_width=True, hide_index=True)
         else:
@@ -608,7 +613,7 @@ def show():
 
     with col2:
         st.markdown("### Order Arrival Rate")
-        fig_flow = plot_order_flow_rate(messages, window=100)
+        fig_flow = plot_order_flow_rate(messages, window=100, date_str=date_str)
         st.plotly_chart(fig_flow, use_container_width=True)
 
     st.markdown("---")
@@ -619,7 +624,7 @@ def show():
     )
 
     if order_id_input > 0:
-        fig_timeline = plot_order_timeline(messages, order_id_input)
+        fig_timeline = plot_order_timeline(messages, order_id_input, date_str)
         st.plotly_chart(fig_timeline, use_container_width=True)
 
     with st.expander("View Complete Order Book (L3)"):

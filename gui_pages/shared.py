@@ -3,6 +3,8 @@ from pathlib import Path
 from lobster_parsing import read_lobster
 from typing import Tuple, Any
 import os
+from datetime import datetime, timedelta
+import zoneinfo
 
 HF_REPO_ID = os.getenv("HF_REPO_ID", "totalorganfailure/lobster-data")
 
@@ -23,6 +25,32 @@ LOBSTER_DATASETS = {
     "MSFT": {"levels": [1, 5, 10, 30, 50], "date": "2012-06-21"},
     "SPY": {"levels": [30, 50], "date": "2012-06-21"},
 }
+
+
+def seconds_to_eastern_time(seconds: float, date_str: str = "2012-06-21") -> str:
+    """
+    Convert LOBSTER timestamp (seconds after midnight) to Eastern time string.
+
+    Args:
+        seconds: Seconds after midnight (decimal)
+        date_str: Date string in YYYY-MM-DD format
+
+    Returns:
+        Formatted time string in Eastern timezone (HH:MM:SS.mmm)
+    """
+    eastern = zoneinfo.ZoneInfo("America/New_York")
+    base_date = datetime.strptime(date_str, "%Y-%m-%d")
+    timestamp = base_date + timedelta(seconds=seconds)
+    timestamp_eastern = timestamp.replace(tzinfo=eastern)
+    return timestamp_eastern.strftime("%H:%M:%S.%f")[:-3]  # Truncate to milliseconds
+
+
+def get_dataset_date(ticker_name: str) -> str:
+    """Extract date from ticker name or use default."""
+    for ticker, info in LOBSTER_DATASETS.items():
+        if ticker in ticker_name:
+            return info["date"]
+    return "2012-06-21"  # Default fallback
 
 
 def discover_local_datasets() -> dict:

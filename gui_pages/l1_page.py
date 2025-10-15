@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from .shared import init_session_state, load_ticker_data
+from .shared import init_session_state, load_ticker_data, seconds_to_eastern_time, get_dataset_date
 
 
 def create_candlestick_data(
@@ -46,6 +46,7 @@ def plot_price_candlestick(
     orderbook: pd.DataFrame,
     current_idx: int,
     window_size: int = 1000,
+    ticker_name: str = "",
 ) -> go.Figure:
     start_idx = max(0, current_idx - window_size)
     end_idx = min(len(messages), current_idx + window_size // 4)
@@ -67,12 +68,16 @@ def plot_price_candlestick(
     candle_window = 50
     candle_data = create_candlestick_data(msg_window, ob_window, window=candle_window)
 
+    # Convert times to Eastern
+    date_str = get_dataset_date(ticker_name)
+
     fig = go.Figure()
 
     if not candle_data.empty:
+        candle_times_et = [seconds_to_eastern_time(t, date_str) for t in candle_data["time"]]
         fig.add_trace(
             go.Candlestick(
-                x=candle_data["time"],
+                x=candle_times_et,
                 open=candle_data["open"],
                 high=candle_data["high"],
                 low=candle_data["low"],
@@ -86,14 +91,15 @@ def plot_price_candlestick(
     exec_events = msg_window[msg_window["type"].isin([4, 5])]
     if not exec_events.empty:
         exec_prices = exec_events["price"] / 10000.0
+        exec_times_et = [seconds_to_eastern_time(t, date_str) for t in exec_events["time"]]
         fig.add_trace(
             go.Scatter(
-                x=exec_events["time"],
+                x=exec_times_et,
                 y=exec_prices,
                 mode="markers",
                 name="Executions",
                 marker=dict(color="orange", size=6, symbol="diamond"),
-                hovertemplate="Execution<br>Time: %{x:.2f}s<br>Price: $%{y:.4f}<extra></extra>",
+                hovertemplate="Execution<br>Time: %{x}<br>Price: $%{y:.4f}<extra></extra>",
             )
         )
 
@@ -101,10 +107,11 @@ def plot_price_candlestick(
         current_msg = messages.iloc[current_idx]
         current_ob = orderbook.iloc[current_idx]
         current_mid = (current_ob["ask_price_1"] + current_ob["bid_price_1"]) / 20000.0
+        current_time_et = seconds_to_eastern_time(current_msg["time"], date_str)
 
         fig.add_trace(
             go.Scatter(
-                x=[current_msg["time"]],
+                x=[current_time_et],
                 y=[current_mid],
                 mode="markers",
                 name="Current",
@@ -114,13 +121,13 @@ def plot_price_candlestick(
                     symbol="star",
                     line=dict(width=2, color="white"),
                 ),
-                hovertemplate="<b>Current Position</b><br>Time: %{x:.2f}s<br>Price: $%{y:.4f}<extra></extra>",
+                hovertemplate="<b>Current Position</b><br>Time: %{x}<br>Price: $%{y:.4f}<extra></extra>",
             )
         )
 
     fig.update_layout(
         title=f"Price Candlestick Chart (Window: {window_size} events)",
-        xaxis_title="Time (seconds after midnight)",
+        xaxis_title="Time (Eastern)",
         yaxis_title="Price ($)",
         height=500,
         hovermode="x unified",
@@ -299,7 +306,8 @@ def show():
 
     st.markdown("### Price Candlestick Chart")
     fig_candle = plot_price_candlestick(
-        messages, orderbook, current_idx, window_size=chart_window
+        messages, orderbook, current_idx, window_size=chart_window,
+        ticker_name=st.session_state.selected_ticker
     )
     st.plotly_chart(
         fig_candle, use_container_width=True, key=f"l1_candle_{current_idx}"
