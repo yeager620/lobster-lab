@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.colors as pc
 from typing import Dict, List, Tuple
 from collections import defaultdict
 from .shared import init_session_state, load_ticker_data
@@ -65,56 +66,74 @@ def plot_order_book_depth_with_queue(
     fig = go.Figure()
 
     if bid_levels:
-        bid_prices_list = []
-        bid_sizes_list = []
-        bid_hover_text = []
-
         for price, orders in bid_levels:
-            total_size = sum(o["size"] for o in orders)
-            num_orders = len(orders)
-            bid_prices_list.append(price)
-            bid_sizes_list.append(total_size)
-            bid_hover_text.append(
-                f"<b>Bids @ ${price:.2f}</b><br>Total Size: {total_size:,}<br>Orders: {num_orders}"
-            )
+            orders_sorted = sorted(orders, key=lambda x: x["time"])
+            cumulative_size = 0
+            queue_length = len(orders_sorted)
+            for queue_idx, order in enumerate(orders_sorted):
+                if queue_length > 1:
+                    scale_value = queue_idx / (queue_length - 1)
+                else:
+                    scale_value = 0
+                color = pc.sample_colorscale("Greens", scale_value)[0]
+                hover_text = (
+                    f"<b>Bid @ ${price:.2f}</b><br>"
+                    f"Queue Pos: {queue_idx + 1}/{queue_length}<br>"
+                    f"Order ID: {order['id']}<br>"
+                    f"Size: {order['size']:,}<br>"
+                    f"Time: {order['time']:.2f}s"
+                )
 
-        fig.add_trace(
-            go.Bar(
-                x=bid_sizes_list,
-                y=bid_prices_list,
-                orientation="h",
-                name="Bids",
-                marker=dict(color="rgba(0, 180, 0, 0.7)"),
-                hovertemplate="%{customdata}<extra></extra>",
-                customdata=bid_hover_text,
-            )
-        )
+                fig.add_trace(
+                    go.Bar(
+                        x=[order["size"]],
+                        y=[price],
+                        base=[cumulative_size],
+                        orientation="h",
+                        name="Bids" if queue_idx == 0 else None,
+                        marker=dict(color=color),
+                        hovertemplate="%{customdata}<extra></extra>",
+                        customdata=[hover_text],
+                        legendgroup="bids",
+                        showlegend=queue_idx == 0,
+                    )
+                )
+                cumulative_size += order["size"]
 
     if ask_levels:
-        ask_prices_list = []
-        ask_sizes_list = []
-        ask_hover_text = []
-
         for price, orders in ask_levels:
-            total_size = sum(o["size"] for o in orders)
-            num_orders = len(orders)
-            ask_prices_list.append(price)
-            ask_sizes_list.append(total_size)
-            ask_hover_text.append(
-                f"<b>Asks @ ${price:.2f}</b><br>Total Size: {total_size:,}<br>Orders: {num_orders}"
-            )
+            orders_sorted = sorted(orders, key=lambda x: x["time"])
+            cumulative_size = 0
+            queue_length = len(orders_sorted)
+            for queue_idx, order in enumerate(orders_sorted):
+                if queue_length > 1:
+                    scale_value = queue_idx / (queue_length - 1)
+                else:
+                    scale_value = 0
+                color = pc.sample_colorscale("Reds", scale_value)[0]
+                hover_text = (
+                    f"<b>Ask @ ${price:.2f}</b><br>"
+                    f"Queue Pos: {queue_idx + 1}/{queue_length}<br>"
+                    f"Order ID: {order['id']}<br>"
+                    f"Size: {order['size']:,}<br>"
+                    f"Time: {order['time']:.2f}s"
+                )
 
-        fig.add_trace(
-            go.Bar(
-                x=ask_sizes_list,
-                y=ask_prices_list,
-                orientation="h",
-                name="Asks",
-                marker=dict(color="rgba(255, 50, 50, 0.7)"),
-                hovertemplate="%{customdata}<extra></extra>",
-                customdata=ask_hover_text,
-            )
-        )
+                fig.add_trace(
+                    go.Bar(
+                        x=[order["size"]],
+                        y=[price],
+                        base=[cumulative_size],
+                        orientation="h",
+                        name="Asks" if queue_idx == 0 else None,
+                        marker=dict(color=color),
+                        hovertemplate="%{customdata}<extra></extra>",
+                        customdata=[hover_text],
+                        legendgroup="asks",
+                        showlegend=queue_idx == 0,
+                    )
+                )
+                cumulative_size += order["size"]
 
     max_size = 0
     if bid_levels:
@@ -127,7 +146,7 @@ def plot_order_book_depth_with_queue(
         )
 
     fig.update_layout(
-        title="Order Book Depth (Aggregated)",
+        title="Order Book Depth by Queue Position",
         xaxis_title="Shares",
         yaxis_title="Price ($)",
         barmode="overlay",
