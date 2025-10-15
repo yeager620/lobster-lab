@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from typing import Optional, Tuple
-from .shared import init_session_state, load_ticker_data
+from .shared import init_session_state, load_ticker_data, seconds_to_eastern_time, get_dataset_date
 
 
 def get_orderbook_depth(
@@ -88,7 +88,7 @@ def plot_orderbook(
     return fig
 
 
-def format_message_details(msg: pd.Series) -> dict:
+def format_message_details(msg: pd.Series, date_str: str = "2012-06-21") -> dict:
     message_types = {
         1: "New Order",
         2: "Cancel",
@@ -101,7 +101,7 @@ def format_message_details(msg: pd.Series) -> dict:
     direction_map = {1: "Buy", -1: "Sell"}
 
     return {
-        "Time (s)": f"{msg['time']:.2f}",
+        "Time": seconds_to_eastern_time(msg['time'], date_str),
         "Type": message_types.get(int(msg["type"]), "Unknown"),
         "Order ID": f"{int(msg['order_id']):,}",
         "Size": f"{int(msg['size']):,}",
@@ -289,7 +289,8 @@ def show():
     st.markdown(f"**Event Type:** :{msg_type_color}[{msg_type_text}]")
 
     st.markdown("#### Current Message Details")
-    msg_details = format_message_details(current_msg)
+    date_str = get_dataset_date(st.session_state.selected_ticker)
+    msg_details = format_message_details(current_msg, date_str)
 
     cols = st.columns(6)
     for i, (key, value) in enumerate(msg_details.items()):
