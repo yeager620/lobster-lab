@@ -11,7 +11,9 @@
 
 *.env
 
-*.streamlit
+# Allow .streamlit/config.toml but ignore secrets
+.streamlit/*
+!.streamlit/config.toml
 
 *.DS_Store
 LOBSTER_SampleFile_*/
