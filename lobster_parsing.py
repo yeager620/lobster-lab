@@ -1,7 +1,7 @@
 """
-LOBSTER CSV parser
+LOBSTER CSV parser with Polars
 
-Implements parsers for LOBSTER message and orderbook CSV files according to
+Implements high-performance parsers for LOBSTER message and orderbook CSV files according to
 "LOBSTER_SampleFiles_ReadMe.txt" contained in the sample folders.
 
 Spec summary (from the ReadMe):
@@ -18,20 +18,24 @@ Spec summary (from the ReadMe):
     Unoccupied price levels are filled with dummy values: ask price 9999999999, bid price -9999999999, sizes 0.
 
 This module exposes:
-- parse_message_file(path, time_as='float'): read full message file to pandas DataFrame.
-- parse_orderbook_file(path, levels=None): read full orderbook file to pandas DataFrame.
+- parse_message_file(path, time_as='float'): read full message file to Polars DataFrame.
+- parse_orderbook_file(path, levels=None): read full orderbook file to Polars DataFrame.
 - iter_lobster(message_path, orderbook_path, chunksize=100_000, time_as='float'):
     iterate the two files in lockstep yielding chunked DataFrames with aligned rows.
+- read_lobster(message_path, orderbook_path, time_as='float', as_pandas=False):
+    convenience function to read entire files.
 
 Notes:
-- By default, the timestamp is parsed as float seconds since midnight. For maximum precision,
-  you can pass time_as='str' to keep the raw string. (Floats may lose nanosecond precision.)
-- Functions avoid adding headers automatically as the raw files have no header line.
+- By default, returns Polars DataFrames for performance.
+- Set as_pandas=True to get pandas DataFrames (for visualization compatibility).
+- The timestamp is parsed as float seconds since midnight by default.
 """
 
 from __future__ import annotations
 
 from typing import Generator, List, Optional, Tuple, Any
+import polars as pl
+
 
 # ---------------------------
 # Helpers
@@ -64,24 +68,13 @@ MESSAGE_COLUMNS = [
     "direction",
 ]
 
-MESSAGE_DTYPES_FLOAT_TIME = {
-    # Keep time as float for convenience by default
-    "time": "float64",
-    "type": "int8",
-    "order_id": "int64",
-    "size": "int32",
-    "price": "int64",
-    "direction": "int8",
-}
-
-MESSAGE_DTYPES_STR_TIME = {
-    # Keep time as str to preserve full precision
-    "time": "string",
-    "type": "int8",
-    "order_id": "int64",
-    "size": "int32",
-    "price": "int64",
-    "direction": "int8",
+MESSAGE_SCHEMA = {
+    "time": pl.Float64,
+    "type": pl.Int8,
+    "order_id": pl.Int64,
+    "size": pl.Int32,
+    "price": pl.Int64,
+    "direction": pl.Int8,
 }
 
 
@@ -90,72 +83,61 @@ MESSAGE_DTYPES_STR_TIME = {
 # ---------------------------
 
 
-def parse_message_file(path: str, time_as: str = "float") -> Any:
+def parse_message_file(path: str, time_as: str = "float") -> pl.DataFrame:
     """
-    Parse a LOBSTER message CSV into a pandas DataFrame.
+    Parse a LOBSTER message CSV into a Polars DataFrame.
 
     Parameters:
     - path: path to the ..._message_LEVEL.csv file
     - time_as: 'float' (default) parses time to float64 seconds; 'str' preserves raw string.
 
-    Returns: DataFrame with columns [time, type, order_id, size, price, direction]
+    Returns: Polars DataFrame with columns [time, type, order_id, size, price, direction]
     """
     if time_as not in ("float", "str"):
         raise ValueError("time_as must be 'float' or 'str'")
 
-    try:
-        import pandas as pd  # Lazy import to avoid hard dependency at module import time
-    except ImportError as e:
-        raise ImportError(
-            "parse_message_file requires pandas. Please install it: pip install pandas"
-        ) from e
+    schema = MESSAGE_SCHEMA.copy()
+    if time_as == "str":
+        schema["time"] = pl.Utf8
 
-    dtypes = (
-        MESSAGE_DTYPES_FLOAT_TIME if time_as == "float" else MESSAGE_DTYPES_STR_TIME
-    )
-
-    df = pd.read_csv(
+    df = pl.read_csv(
         path,
-        header=None,
-        names=MESSAGE_COLUMNS,
-        dtype=dtypes,
+        has_header=False,
+        new_columns=MESSAGE_COLUMNS,
+        schema=schema,
     )
     return df
 
 
-def parse_orderbook_file(path: str, levels: Optional[int] = None) -> Any:
+def parse_orderbook_file(path: str, levels: Optional[int] = None) -> pl.DataFrame:
     """
-    Parse a LOBSTER orderbook CSV into a pandas DataFrame.
+    Parse a LOBSTER orderbook CSV into a Polars DataFrame.
 
     Parameters:
     - path: path to the ..._orderbook_LEVEL.csv file
     - levels: number of levels; if None, inferred from number of columns (must be multiple of 4)
 
-    Returns: DataFrame with columns [ask_price_1, ask_size_1, bid_price_1, bid_size_1, ..., ..._L]
+    Returns: Polars DataFrame with columns [ask_price_1, ask_size_1, bid_price_1, bid_size_1, ..., ..._L]
     """
-    try:
-        import pandas as pd  # Lazy import
-    except ImportError as e:
-        raise ImportError(
-            "parse_orderbook_file requires pandas. Please install it: pip install pandas"
-        ) from e
-
-    # Read one small chunk to infer columns if needed
-    preview = pd.read_csv(path, header=None, nrows=1)
-    n_cols = preview.shape[1]
+    # Read one row to infer number of columns
+    preview = pl.read_csv(path, has_header=False, n_rows=1)
+    n_cols = len(preview.columns)
 
     inferred_levels = _infer_levels_from_orderbook_columns(n_cols)
     L = levels or inferred_levels
     if L != inferred_levels:
-        # If user-provided levels disagree with file columns, raise to prevent silent misalignment
         raise ValueError(
             f"Provided levels={levels} does not match file columns={n_cols} (implies {inferred_levels} levels)."
         )
 
     names = orderbook_column_names(L)
 
-    # Read full file with proper names; default dtype is fine (prices and sizes fit in 64-bit)
-    df = pd.read_csv(path, header=None, names=names)
+    # Read full file with proper names
+    df = pl.read_csv(
+        path,
+        has_header=False,
+        new_columns=names,
+    )
     return df
 
 
@@ -165,7 +147,7 @@ def iter_lobster(
     *,
     chunksize: int = 100_000,
     time_as: str = "float",
-) -> Generator[Tuple[Any, Any], None, None]:
+) -> Generator[Tuple[pl.DataFrame, pl.DataFrame], None, None]:
     """
     Iterate over message and orderbook files in lockstep, yielding aligned chunks.
 
@@ -181,46 +163,50 @@ def iter_lobster(
     if time_as not in ("float", "str"):
         raise ValueError("time_as must be 'float' or 'str'")
 
-    try:
-        import pandas as pd  # Lazy import
-    except ImportError as e:
-        raise ImportError(
-            "iter_lobster requires pandas. Please install it: pip install pandas"
-        ) from e
+    # Prepare schema for messages
+    schema = MESSAGE_SCHEMA.copy()
+    if time_as == "str":
+        schema["time"] = pl.Utf8
 
-    # Prepare readers
-    msg_dtypes = (
-        MESSAGE_DTYPES_FLOAT_TIME if time_as == "float" else MESSAGE_DTYPES_STR_TIME
-    )
-
-    msg_reader = pd.read_csv(
-        message_path,
-        header=None,
-        names=MESSAGE_COLUMNS,
-        dtype=msg_dtypes,
-        chunksize=chunksize,
-    )
-
-    # Infer orderbook columns and prepare reader with names
-    preview = pd.read_csv(orderbook_path, header=None, nrows=1)
-    L = _infer_levels_from_orderbook_columns(preview.shape[1])
+    # Infer orderbook columns
+    ob_preview = pl.read_csv(orderbook_path, has_header=False, n_rows=1)
+    L = _infer_levels_from_orderbook_columns(len(ob_preview.columns))
     ob_names = orderbook_column_names(L)
 
-    ob_reader = pd.read_csv(
-        orderbook_path,
-        header=None,
-        names=ob_names,
-        chunksize=chunksize,
+    # Read files with batched reader
+    msg_batches = pl.read_csv_batched(
+        message_path,
+        has_header=False,
+        new_columns=MESSAGE_COLUMNS,
+        schema=schema,
+        batch_size=chunksize,
     )
 
-    for msg_chunk, ob_chunk in zip(msg_reader, ob_reader):
-        # Basic sanity check: ensure same number of rows in the chunk
-        if len(msg_chunk) != len(ob_chunk):
+    ob_batches = pl.read_csv_batched(
+        orderbook_path,
+        has_header=False,
+        new_columns=ob_names,
+        batch_size=chunksize,
+    )
+
+    while True:
+        msg_chunk = msg_batches.next_batches(1)
+        ob_chunk = ob_batches.next_batches(1)
+
+        if not msg_chunk or not ob_chunk:
+            break
+
+        msg_df = msg_chunk[0]
+        ob_df = ob_chunk[0]
+
+        # Sanity check: ensure same number of rows
+        if len(msg_df) != len(ob_df):
             raise ValueError(
-                f"Chunk misalignment: message rows {len(msg_chunk)} != orderbook rows {len(ob_chunk)}.\n"
+                f"Chunk misalignment: message rows {len(msg_df)} != orderbook rows {len(ob_df)}.\n"
                 f"Ensure files correspond to the same ticker/day/level."
             )
-        yield msg_chunk, ob_chunk
+
+        yield msg_df, ob_df
 
 
 def read_lobster(
@@ -228,19 +214,33 @@ def read_lobster(
     orderbook_path: str,
     *,
     time_as: str = "float",
+    as_pandas: bool = False,
 ) -> Tuple[Any, Any]:
     """
     Convenience function to read the entire day into memory, returning (messages, orderbook).
+
+    Parameters:
+    - message_path: path to message CSV
+    - orderbook_path: path to orderbook CSV
+    - time_as: 'float' or 'str'
+    - as_pandas: if True, convert to pandas DataFrames (for visualization); default False returns Polars
+
+    Returns: Tuple of (messages, orderbook) as either Polars or pandas DataFrames
 
     For large files prefer iter_lobster(...).
     """
     messages = parse_message_file(message_path, time_as=time_as)
     orderbook = parse_orderbook_file(orderbook_path)
+
     if len(messages) != len(orderbook):
         raise ValueError(
             f"Row count mismatch: message rows {len(messages)} != orderbook rows {len(orderbook)}.\n"
             f"Ensure files correspond to the same ticker/day/level."
         )
+
+    if as_pandas:
+        return messages.to_pandas(), orderbook.to_pandas()
+
     return messages, orderbook
 
 
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     ob_path = f"{aapl_dir}/AAPL_2012-06-21_34200000_37800000_orderbook_50.csv"
     try:
         msgs, obs = read_lobster(msg_path, ob_path)
-        print("Loaded:", len(msgs), "events,", obs.shape[1] // 4, "levels")
+        print("Loaded:", len(msgs), "events,", len(obs.columns) // 4, "levels")
         print(msgs.head())
         print(obs.head())
     except FileNotFoundError:

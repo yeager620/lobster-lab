@@ -1,40 +1,16 @@
+"""L2 (Price-Level) Order Book Visualization Page"""
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from pathlib import Path
-from lobster_parsing import read_lobster
 from typing import Optional, Tuple
-
-
-st.set_page_config(
-    page_title="LOBSTER Order Book Visualizer",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-
-@st.cache_data
-def load_data(
-    message_path: str, orderbook_path: str
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    return read_lobster(message_path, orderbook_path)
-
-
-def validate_ticker_files(ticker_name: str, msg_path: str, ob_path: str) -> bool:
-    return Path(msg_path).exists() and Path(ob_path).exists()
-
-
-def get_available_tickers(sample_files: dict) -> dict:
-    available = {}
-    for ticker, (msg_path, ob_path) in sample_files.items():
-        if validate_ticker_files(ticker, msg_path, ob_path):
-            available[ticker] = (msg_path, ob_path)
-    return available
+from .shared import init_session_state, load_ticker_data
 
 
 def get_orderbook_depth(
     ob_row: pd.Series, levels: int = 10
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Extract bid and ask depth from order book snapshot."""
     bids = []
     asks = []
 
@@ -61,6 +37,7 @@ def get_orderbook_depth(
 def plot_orderbook(
     bids: pd.DataFrame, asks: pd.DataFrame, current_msg: Optional[pd.Series] = None
 ) -> go.Figure:
+    """Create horizontal bar chart of order book depth."""
     fig = go.Figure()
 
     if not bids.empty:
@@ -115,86 +92,8 @@ def plot_orderbook(
     return fig
 
 
-def plot_price_history(
-    messages: pd.DataFrame,
-    orderbook: pd.DataFrame,
-    current_idx: int,
-    window_size: int = 1000,
-) -> go.Figure:
-    start_idx = max(0, current_idx - window_size)
-    end_idx = min(len(messages), current_idx + window_size // 4)
-
-    msg_window = messages.iloc[start_idx:end_idx]
-    ob_window = orderbook.iloc[start_idx:end_idx]
-
-    mid_prices = []
-    times = []
-    for i in range(len(ob_window)):
-        ob = ob_window.iloc[i]
-        ask_px = ob["ask_price_1"]
-        bid_px = ob["bid_price_1"]
-        if bid_px > 0 and ask_px < 9999999999:
-            mid = (bid_px + ask_px) / 20000.0
-            mid_prices.append(mid)
-            times.append(msg_window.iloc[i]["time"])
-
-    fig = go.Figure()
-
-    fig.add_trace(
-        go.Scatter(
-            x=times,
-            y=mid_prices,
-            mode="lines",
-            name="Mid Price",
-            line=dict(color="blue", width=1),
-            hovertemplate="Time: %{x:.2f}s<br>Price: $%{y:.4f}<extra></extra>",
-        )
-    )
-
-    exec_events = msg_window[msg_window["type"].isin([4, 5])]
-    if not exec_events.empty:
-        exec_prices = exec_events["price"] / 10000.0
-        fig.add_trace(
-            go.Scatter(
-                x=exec_events["time"],
-                y=exec_prices,
-                mode="markers",
-                name="Executions",
-                marker=dict(color="orange", size=6, symbol="diamond"),
-                hovertemplate="Execution<br>Time: %{x:.2f}s<br>Price: $%{y:.4f}<extra></extra>",
-            )
-        )
-
-    if current_idx < len(messages):
-        current_msg = messages.iloc[current_idx]
-        current_ob = orderbook.iloc[current_idx]
-        current_mid = (current_ob["ask_price_1"] + current_ob["bid_price_1"]) / 20000.0
-
-        fig.add_trace(
-            go.Scatter(
-                x=[current_msg["time"]],
-                y=[current_mid],
-                mode="markers",
-                name="Current",
-                marker=dict(color="red", size=12, symbol="star"),
-                hovertemplate="<b>Current Position</b><br>Time: %{x:.2f}s<br>Price: $%{y:.4f}<extra></extra>",
-            )
-        )
-
-    fig.update_layout(
-        title=f"Price History (Window: {window_size} events)",
-        xaxis_title="Time (seconds after midnight)",
-        yaxis_title="Price ($)",
-        height=350,
-        hovermode="x unified",
-        showlegend=True,
-        margin=dict(l=60, r=60, t=50, b=50),
-    )
-
-    return fig
-
-
 def format_message_details(msg: pd.Series) -> dict:
+    """Format message data for display."""
     message_types = {
         1: "New Order",
         2: "Cancel",
@@ -208,7 +107,7 @@ def format_message_details(msg: pd.Series) -> dict:
 
     return {
         "Time (s)": f"{msg['time']:.2f}",
-        "Type": message_types.get(int(msg['type']), 'Unknown'),
+        "Type": message_types.get(int(msg["type"]), "Unknown"),
         "Order ID": f"{int(msg['order_id']):,}",
         "Size": f"{int(msg['size']):,}",
         "Price": f"${msg['price'] / 10000.0:.2f}",
@@ -216,86 +115,29 @@ def format_message_details(msg: pd.Series) -> dict:
     }
 
 
-def main():
-    st.title("LOBSTER Order Book Visualizer")
-
-    all_sample_files = {
-        "AAPL (50 levels)": (
-            "LOBSTER_SampleFile_AAPL_2012-06-21_50/AAPL_2012-06-21_34200000_37800000_message_50.csv",
-            "LOBSTER_SampleFile_AAPL_2012-06-21_50/AAPL_2012-06-21_34200000_37800000_orderbook_50.csv",
-        ),
-        "MSFT (50 levels)": (
-            "LOBSTER_SampleFile_MSFT_2012-06-21_50/MSFT_2012-06-21_34200000_37800000_message_50.csv",
-            "LOBSTER_SampleFile_MSFT_2012-06-21_50/MSFT_2012-06-21_34200000_37800000_orderbook_50.csv",
-        ),
-        "SPY (50 levels)": (
-            "LOBSTER_SampleFile_SPY_2012-06-21_50/SPY_2012-06-21_34200000_37800000_message_50.csv",
-            "LOBSTER_SampleFile_SPY_2012-06-21_50/SPY_2012-06-21_34200000_37800000_orderbook_50.csv",
-        ),
-        "GOOG (10 levels)": (
-            "LOBSTER_SampleFile_GOOG_2012-06-21_10/GOOG_2012-06-21_34200000_57600000_message_10.csv",
-            "LOBSTER_SampleFile_GOOG_2012-06-21_10/GOOG_2012-06-21_34200000_57600000_orderbook_10.csv",
-        ),
-    }
-
-    available_tickers = get_available_tickers(all_sample_files)
-
-    if not available_tickers:
-        st.error(
-            "No LOBSTER data files found. Please ensure sample data directories exist in the current directory."
-        )
-        return
-
-    if "selected_ticker" not in st.session_state:
-        st.session_state.selected_ticker = list(available_tickers.keys())[0]
-    if "current_idx" not in st.session_state:
-        st.session_state.current_idx = 0
-    if "messages" not in st.session_state:
-        st.session_state.messages = None
-    if "orderbook" not in st.session_state:
-        st.session_state.orderbook = None
-
-    st.sidebar.header("Data Selection")
-
-    selected_ticker = st.sidebar.selectbox(
-        "Select Ticker",
-        list(available_tickers.keys()),
-        index=list(available_tickers.keys()).index(st.session_state.selected_ticker)
-        if st.session_state.selected_ticker in available_tickers
-        else 0,
-        key="ticker_selector",
+def show():
+    """Render the L2 visualization page."""
+    st.title("L2 Order Book Visualizer")
+    st.markdown(
+        "**Level 2 (Price-Level) Visualization** - Aggregated liquidity by price"
     )
 
-    if selected_ticker != st.session_state.selected_ticker:
-        st.session_state.selected_ticker = selected_ticker
-        st.session_state.current_idx = 0
-        st.session_state.messages = None
-        st.session_state.orderbook = None
+    # Initialize session state
+    init_session_state()
 
-    msg_path, ob_path = available_tickers[selected_ticker]
+    # Load data
+    messages, orderbook, available_tickers = load_ticker_data()
 
-    try:
-        if st.session_state.messages is None or st.session_state.orderbook is None:
-            with st.spinner("Loading LOBSTER data..."):
-                messages, orderbook = load_data(msg_path, ob_path)
-                st.session_state.messages = messages
-                st.session_state.orderbook = orderbook
-        else:
-            messages = st.session_state.messages
-            orderbook = st.session_state.orderbook
-
-        st.sidebar.success(f"Loaded {len(messages):,} events")
-
-        n_levels = len(
-            [col for col in orderbook.columns if col.startswith("ask_price_")]
+    if messages is None:
+        st.error(
+            "No LOBSTER data files found. Please ensure sample data directories exist."
         )
-
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        st.error(f"Message path: {msg_path}")
-        st.error(f"Orderbook path: {ob_path}")
         return
 
+    # Determine number of levels
+    n_levels = len([col for col in orderbook.columns if col.startswith("ask_price_")])
+
+    # Sidebar controls
     st.sidebar.header("Playback Controls")
 
     max_idx = len(messages) - 1
@@ -305,31 +147,31 @@ def main():
         st.session_state.current_idx = 0
 
     step_size = st.sidebar.selectbox(
-        "Step Size", [1, 10, 100, 1000], index=1, key="step_size_selector"
+        "Step Size", [1, 10, 100, 1000], index=0, key="step_size_selector"
     )
 
     st.sidebar.markdown("**Navigation**")
     nav_col1, nav_col2 = st.sidebar.columns([1, 1])
 
     with nav_col1:
-        if st.button("<<- Back", key="btn_back", use_container_width=True):
+        if st.button(f"-{step_size}", key="btn_back", use_container_width=True):
             st.session_state.current_idx = max(
                 0, st.session_state.current_idx - step_size
             )
             st.rerun()
 
-        if st.button("<- -1", key="btn_back_one", use_container_width=True):
+        if st.button("-1", key="btn_back_one", use_container_width=True):
             st.session_state.current_idx = max(0, st.session_state.current_idx - 1)
             st.rerun()
 
     with nav_col2:
-        if st.button("Next ->>", key="btn_next", use_container_width=True):
+        if st.button(f"+{step_size}", key="btn_next", use_container_width=True):
             st.session_state.current_idx = min(
                 max_idx, st.session_state.current_idx + step_size
             )
             st.rerun()
 
-        if st.button("+1 ->", key="btn_next_one", use_container_width=True):
+        if st.button("+1", key="btn_next_one", use_container_width=True):
             st.session_state.current_idx = min(
                 max_idx, st.session_state.current_idx + 1
             )
@@ -360,7 +202,7 @@ def main():
 
     event_col1, event_col2 = st.sidebar.columns(2)
     with event_col1:
-        if st.button("<- Prev", key="btn_prev_event", use_container_width=True):
+        if st.button("Prev", key="btn_prev_event", use_container_width=True):
             target_type = event_type[0]
             found_idx = None
             for i in range(st.session_state.current_idx - 1, -1, -1):
@@ -380,7 +222,7 @@ def main():
                 )
 
     with event_col2:
-        if st.button("Next ->", key="btn_next_event", use_container_width=True):
+        if st.button("Next", key="btn_next_event", use_container_width=True):
             target_type = event_type[0]
             found_idx = None
             for i in range(st.session_state.current_idx + 1, len(messages)):
@@ -434,15 +276,7 @@ def main():
         key="levels_slider",
     )
 
-    price_window = st.sidebar.slider(
-        "Price History Window",
-        min_value=100,
-        max_value=10000,
-        value=1000,
-        step=100,
-        key="window_slider",
-    )
-
+    # Main content area
     current_idx = st.session_state.current_idx
     current_msg = messages.iloc[current_idx]
     current_ob = orderbook.iloc[current_idx]
@@ -501,16 +335,6 @@ def main():
     else:
         st.warning("No valid order book data at this index.")
 
-    st.markdown("---")
-
-    st.markdown("#### Price Time Series")
-    fig_price = plot_price_history(
-        messages, orderbook, current_idx, window_size=price_window
-    )
-    st.plotly_chart(
-        fig_price, use_container_width=True, key=f"price_chart_{current_idx}"
-    )
-
     with st.expander("View Raw Data"):
         col1, col2 = st.columns(2)
         with col1:
@@ -520,7 +344,3 @@ def main():
             st.write("**Order Book Data (First 10 levels)**")
             ob_display = current_ob.to_frame().head(40)
             st.dataframe(ob_display, use_container_width=True)
-
-
-if __name__ == "__main__":
-    main()
