@@ -1,0 +1,52 @@
+name: Deploy to Streamlit and Hugging Face
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # Deploy to Hugging Face Spaces
+      - name: Push to Hugging Face Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+          # Add HF remote if it doesn't exist
+          git remote add hf https://huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }} || true
+
+          # Push to HF Spaces
+          git push https://user:$HF_TOKEN@huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }} main:main --force
+
+      # Trigger Streamlit Cloud redeploy
+      - name: Trigger Streamlit Cloud Deployment
+        env:
+          STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
+        run: |
+          echo "Streamlit Cloud will auto-deploy from this push to main branch"
+          echo "App URL: $STREAMLIT_APP_URL"
+          # Streamlit Cloud automatically deploys when main branch is updated
+          # No API call needed - it monitors the GitHub repo
+
+      - name: Deployment Summary
+        run: |
+          echo "✅ Deployment initiated"
+          echo "📦 Hugging Face Spaces: https://huggingface.co/spaces/${{ secrets.HF_SPACE_NAME }}"
+          echo "🎈 Streamlit Cloud: ${{ secrets.STREAMLIT_APP_URL }}"
