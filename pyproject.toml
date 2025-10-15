@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "LOBSTER market data parser and visualizer with backtesting"
 readme = "README.md"
 requires-python = ">=3.13"
+license = {text = "BSD-3-Clause"}
 dependencies = [
     "polars>=1.0.0",
     "streamlit>=1.28.0",
@@ -12,5 +13,7 @@ dependencies = [
     "bs4>=0.0.2",
 ]
 
-[tool.setuptools]
-py-modules = ["lobster_parsing", "backtesting", "main"]
+[dependency-groups]
+dev = [
+    "ruff>=0.1.0",
+]
