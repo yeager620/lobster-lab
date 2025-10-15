@@ -95,89 +95,131 @@ def plot_order_book_depth_with_queue(
 
     fig = go.Figure()
 
+    # Bid side - aggregate bars with details in hover
     if bid_levels:
+        bid_prices_list = []
+        bid_sizes_list = []
+        bid_hover_list = []
+
         for price, orders in bid_levels:
             orders_sorted = sorted(orders, key=lambda x: x["time"])
-            cumulative_size = 0
+            total_size = sum(o["size"] for o in orders_sorted)
             queue_length = len(orders_sorted)
-            for queue_idx, order in enumerate(orders_sorted):
-                color = _sample_queue_color("Greens", queue_idx, queue_length, "green")
-                hover_text = (
-                    f"<b>Bid @ ${price:.2f}</b><br>"
-                    f"Queue Pos: {queue_idx + 1}/{queue_length}<br>"
-                    f"Order ID: {order['id']}<br>"
-                    f"Size: {order['size']:,}<br>"
-                    f"Time: {order['time']:.2f}s"
-                )
 
-                fig.add_trace(
-                    go.Bar(
-                        x=[order["size"]],
-                        y=[price],
-                        base=[cumulative_size],
-                        orientation="h",
-                        name="Bids" if queue_idx == 0 else None,
-                        marker=dict(color=color),
-                        hovertemplate="%{customdata}<extra></extra>",
-                        customdata=[hover_text],
-                        legendgroup="bids",
-                        showlegend=queue_idx == 0,
-                    )
-                )
-                cumulative_size += order["size"]
+            # Create hover text with queue details
+            hover_lines = [f"<b>Bid @ ${price:.2f}</b>",
+                          f"Total Size: {total_size:,} shares",
+                          f"Orders in Queue: {queue_length}",
+                          "<br><b>Queue Details:</b>"]
 
+            # Show top 5 orders in queue
+            for i, order in enumerate(orders_sorted[:5]):
+                hover_lines.append(
+                    f"  #{i+1}: {order['size']:,} sh (ID: {order['id']})"
+                )
+            if len(orders_sorted) > 5:
+                hover_lines.append(f"  ... and {len(orders_sorted)-5} more")
+
+            bid_prices_list.append(price)
+            bid_sizes_list.append(total_size)
+            bid_hover_list.append("<br>".join(hover_lines))
+
+        fig.add_trace(
+            go.Bar(
+                x=bid_sizes_list,
+                y=bid_prices_list,
+                orientation="h",
+                name="Bids",
+                marker=dict(
+                    color=bid_sizes_list,
+                    colorscale="Greens",
+                    showscale=False,
+                    line=dict(color="darkgreen", width=1)
+                ),
+                hovertemplate="%{customdata}<extra></extra>",
+                customdata=bid_hover_list,
+            )
+        )
+
+    # Ask side - aggregate bars with details in hover
     if ask_levels:
+        ask_prices_list = []
+        ask_sizes_list = []
+        ask_hover_list = []
+
         for price, orders in ask_levels:
             orders_sorted = sorted(orders, key=lambda x: x["time"])
-            cumulative_size = 0
+            total_size = sum(o["size"] for o in orders_sorted)
             queue_length = len(orders_sorted)
-            for queue_idx, order in enumerate(orders_sorted):
-                color = _sample_queue_color("Reds", queue_idx, queue_length, "red")
-                hover_text = (
-                    f"<b>Ask @ ${price:.2f}</b><br>"
-                    f"Queue Pos: {queue_idx + 1}/{queue_length}<br>"
-                    f"Order ID: {order['id']}<br>"
-                    f"Size: {order['size']:,}<br>"
-                    f"Time: {order['time']:.2f}s"
-                )
 
-                fig.add_trace(
-                    go.Bar(
-                        x=[order["size"]],
-                        y=[price],
-                        base=[cumulative_size],
-                        orientation="h",
-                        name="Asks" if queue_idx == 0 else None,
-                        marker=dict(color=color),
-                        hovertemplate="%{customdata}<extra></extra>",
-                        customdata=[hover_text],
-                        legendgroup="asks",
-                        showlegend=queue_idx == 0,
-                    )
-                )
-                cumulative_size += order["size"]
+            # Create hover text with queue details
+            hover_lines = [f"<b>Ask @ ${price:.2f}</b>",
+                          f"Total Size: {total_size:,} shares",
+                          f"Orders in Queue: {queue_length}",
+                          "<br><b>Queue Details:</b>"]
 
+            # Show top 5 orders in queue
+            for i, order in enumerate(orders_sorted[:5]):
+                hover_lines.append(
+                    f"  #{i+1}: {order['size']:,} sh (ID: {order['id']})"
+                )
+            if len(orders_sorted) > 5:
+                hover_lines.append(f"  ... and {len(orders_sorted)-5} more")
+
+            ask_prices_list.append(price)
+            ask_sizes_list.append(total_size)
+            ask_hover_list.append("<br>".join(hover_lines))
+
+        fig.add_trace(
+            go.Bar(
+                x=ask_sizes_list,
+                y=ask_prices_list,
+                orientation="h",
+                name="Asks",
+                marker=dict(
+                    color=ask_sizes_list,
+                    colorscale="Reds",
+                    showscale=False,
+                    line=dict(color="darkred", width=1)
+                ),
+                hovertemplate="%{customdata}<extra></extra>",
+                customdata=ask_hover_list,
+            )
+        )
+
+    # Calculate reasonable x-axis range
     max_size = 0
     if bid_levels:
-        max_size = max(
-            max_size, max(sum(o["size"] for o in orders) for _, orders in bid_levels)
-        )
+        max_size = max(max_size, max(sum(o["size"] for o in orders) for _, orders in bid_levels))
     if ask_levels:
-        max_size = max(
-            max_size, max(sum(o["size"] for o in orders) for _, orders in ask_levels)
-        )
+        max_size = max(max_size, max(sum(o["size"] for o in orders) for _, orders in ask_levels))
 
     fig.update_layout(
-        title="Order Book Depth by Queue Position",
-        xaxis_title="Shares",
+        title="Order Book Depth (Aggregated by Price Level)",
+        xaxis_title="Total Shares at Price Level",
         yaxis_title="Price ($)",
         barmode="overlay",
-        height=600,
-        hovermode="closest",
+        height=700,
+        hovermode="y unified",
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(l=80, r=80, t=80, b=60),
-        xaxis=dict(range=[0, max_size * 1.1] if max_size > 0 else [0, 100]),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(l=90, r=40, t=80, b=60),
+        xaxis=dict(
+            range=[0, max_size * 1.15] if max_size > 0 else [0, 100],
+            gridcolor="lightgray",
+            gridwidth=0.5,
+        ),
+        yaxis=dict(
+            gridcolor="lightgray",
+            gridwidth=0.5,
+        ),
+        plot_bgcolor="white",
     )
 
     return fig, bid_levels, ask_levels
