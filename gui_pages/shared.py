@@ -120,7 +120,12 @@ def init_session_state():
     if "selected_ticker" not in st.session_state:
         available = get_available_tickers(ALL_SAMPLE_FILES)
         if available:
-            st.session_state.selected_ticker = list(available.keys())[0]
+            # Default to SPY (30 levels) if available
+            default_ticker = "SPY (30 levels)"
+            if default_ticker in available:
+                st.session_state.selected_ticker = default_ticker
+            else:
+                st.session_state.selected_ticker = list(available.keys())[0]
     if "current_idx" not in st.session_state:
         st.session_state.current_idx = 0
     if "messages" not in st.session_state:
