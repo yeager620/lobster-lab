@@ -10,8 +10,8 @@ import os
 # Example: export HF_REPO_ID="username/lobster-data"
 # Or create a .streamlit/secrets.toml file with: HF_REPO_ID = "username/lobster-data"
 
-# Try to get from environment variable first
-HF_REPO_ID = os.getenv("HF_REPO_ID", "")
+# Default to your HuggingFace repository
+HF_REPO_ID = os.getenv("HF_REPO_ID", "totalorganfailure/lobster-data")
 
 # If not in environment, try Streamlit secrets
 if not HF_REPO_ID and hasattr(st, "secrets") and "HF_REPO_ID" in st.secrets:
@@ -23,31 +23,84 @@ if USE_HUGGINGFACE:
     from huggingface_hub import hf_hub_download
 
 
-# Sample file definitions
-# Note: Add directories to match your local files or HF repository structure
-# Sample datasets available at: https://lobsterdata.com/info/DataSamples.php
-ALL_SAMPLE_FILES = {
-    "AAPL (50 levels)": (
-        "LOBSTER_SampleFile_AAPL_2012-06-21_50/AAPL_2012-06-21_34200000_37800000_message_50.csv",
-        "LOBSTER_SampleFile_AAPL_2012-06-21_50/AAPL_2012-06-21_34200000_37800000_orderbook_50.csv",
-    ),
-    "MSFT (50 levels)": (
-        "LOBSTER_SampleFile_MSFT_2012-06-21_50/MSFT_2012-06-21_34200000_37800000_message_50.csv",
-        "LOBSTER_SampleFile_MSFT_2012-06-21_50/MSFT_2012-06-21_34200000_37800000_orderbook_50.csv",
-    ),
-    "SPY (50 levels)": (
-        "LOBSTER_SampleFile_SPY_2012-06-21_50/SPY_2012-06-21_34200000_37800000_message_50.csv",
-        "LOBSTER_SampleFile_SPY_2012-06-21_50/SPY_2012-06-21_34200000_37800000_orderbook_50.csv",
-    ),
-    "GOOG (10 levels)": (
-        "LOBSTER_SampleFile_GOOG_2012-06-21_10/GOOG_2012-06-21_34200000_57600000_message_10.csv",
-        "LOBSTER_SampleFile_GOOG_2012-06-21_10/GOOG_2012-06-21_34200000_57600000_orderbook_10.csv",
-    ),
-    "INTC (10 levels)": (
-        "LOBSTER_SampleFile_INTC_2012-06-21_10/INTC_2012-06-21_34200000_57600000_message_10.csv",
-        "LOBSTER_SampleFile_INTC_2012-06-21_10/INTC_2012-06-21_34200000_57600000_orderbook_10.csv",
-    ),
+# LOBSTER dataset configuration matching sync_datasets.py
+LOBSTER_DATASETS = {
+    "AMZN": {"levels": [1, 5, 10], "date": "2012-06-21"},
+    "AAPL": {"levels": [1, 5, 10, 30, 50], "date": "2012-06-21"},
+    "GOOG": {"levels": [1, 5, 10], "date": "2012-06-21"},
+    "INTC": {"levels": [1, 5, 10], "date": "2012-06-21"},
+    "MSFT": {"levels": [1, 5, 10, 30, 50], "date": "2012-06-21"},
+    "SPY": {"levels": [30, 50], "date": "2012-06-21"},
 }
+
+
+def discover_local_datasets() -> dict:
+    """Discover all LOBSTER dataset directories in the current working directory."""
+    datasets = {}
+    cwd = Path.cwd()
+
+    # Find all LOBSTER sample directories
+    for dir_path in sorted(cwd.glob("LOBSTER_SampleFile_*")):
+        if not dir_path.is_dir():
+            continue
+
+        # Parse directory name: LOBSTER_SampleFile_TICKER_DATE_LEVELS
+        parts = dir_path.name.split("_")
+        if len(parts) < 5:
+            continue
+
+        ticker = parts[2]
+        levels = parts[4]
+
+        # Find message and orderbook CSV files in the directory
+        message_files = list(dir_path.glob("*_message_*.csv"))
+        orderbook_files = list(dir_path.glob("*_orderbook_*.csv"))
+
+        if message_files and orderbook_files:
+            # Use the first matching file
+            msg_path = str(message_files[0])
+            ob_path = str(orderbook_files[0])
+
+            # Create a display name
+            display_name = f"{ticker} ({levels} levels)"
+            datasets[display_name] = (msg_path, ob_path)
+
+    return datasets
+
+
+def generate_hf_dataset_list() -> dict:
+    """Generate dataset list for HuggingFace based on LOBSTER_DATASETS configuration."""
+    datasets = {}
+
+    for ticker, info in LOBSTER_DATASETS.items():
+        date = info["date"]
+        for level in info["levels"]:
+            # Construct paths matching the HuggingFace repository structure
+            dir_name = f"LOBSTER_SampleFile_{ticker}_{date}_{level}"
+
+            # Find the time range - we need to handle different ranges per ticker
+            if ticker in ["AAPL", "MSFT"] and level >= 30:
+                time_range = "34200000_37800000"
+            elif ticker == "SPY":
+                time_range = "34200000_37800000"
+            else:
+                time_range = "34200000_57600000"
+
+            msg_path = f"{dir_name}/{ticker}_{date}_{time_range}_message_{level}.csv"
+            ob_path = f"{dir_name}/{ticker}_{date}_{time_range}_orderbook_{level}.csv"
+
+            display_name = f"{ticker} ({level} levels)"
+            datasets[display_name] = (msg_path, ob_path)
+
+    return datasets
+
+
+# Sample file definitions
+# Use HuggingFace dataset list if configured, otherwise discover local datasets
+if USE_HUGGINGFACE:
+    ALL_SAMPLE_FILES = generate_hf_dataset_list()
+else:
+    ALL_SAMPLE_FILES = discover_local_datasets()
 
 
 @st.cache_data

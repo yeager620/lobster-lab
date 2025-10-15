@@ -1,5 +1,3 @@
-"""L2 (Price-Level) Order Book Visualization Page"""
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -10,7 +8,6 @@ from .shared import init_session_state, load_ticker_data
 def get_orderbook_depth(
     ob_row: pd.Series, levels: int = 10
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Extract bid and ask depth from order book snapshot."""
     bids = []
     asks = []
 
@@ -37,7 +34,6 @@ def get_orderbook_depth(
 def plot_orderbook(
     bids: pd.DataFrame, asks: pd.DataFrame, current_msg: Optional[pd.Series] = None
 ) -> go.Figure:
-    """Create horizontal bar chart of order book depth."""
     fig = go.Figure()
 
     if not bids.empty:
@@ -122,10 +118,8 @@ def show():
         "**Level 2 (Price-Level) Visualization** - Aggregated liquidity by price"
     )
 
-    # Initialize session state
     init_session_state()
 
-    # Load data
     messages, orderbook, available_tickers = load_ticker_data()
 
     if messages is None:
@@ -134,10 +128,8 @@ def show():
         )
         return
 
-    # Determine number of levels
     n_levels = len([col for col in orderbook.columns if col.startswith("ask_price_")])
 
-    # Sidebar controls
     st.sidebar.header("Playback Controls")
 
     max_idx = len(messages) - 1
@@ -267,16 +259,20 @@ def show():
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("Visualization Settings")
-    display_levels = st.sidebar.slider(
-        "Order Book Levels to Display",
-        min_value=1,
-        max_value=n_levels,
-        value=min(10, n_levels),
-        step=1,
-        key="levels_slider",
-    )
 
-    # Main content area
+    if n_levels > 1:
+        display_levels = st.sidebar.slider(
+            "Order Book Levels to Display",
+            min_value=1,
+            max_value=n_levels,
+            value=min(10, n_levels),
+            step=1,
+            key="levels_slider",
+        )
+    else:
+        st.sidebar.info(f"Dataset has {n_levels} level only")
+        display_levels = 1
+
     current_idx = st.session_state.current_idx
     current_msg = messages.iloc[current_idx]
     current_ob = orderbook.iloc[current_idx]

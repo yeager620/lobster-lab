@@ -32,6 +32,11 @@ def parse_args():
         help="Specific tickers",
     )
     parser.add_argument("--private", action="store_true", help="Private repo")
+    parser.add_argument(
+        "--force-readme",
+        action="store_true",
+        help="Force update README even if no changes",
+    )
     return parser.parse_args()
 
 
@@ -49,7 +54,6 @@ def get_local_datasets() -> Set[Tuple[str, int]]:
 
 def get_hf_datasets(repo_id: str) -> Set[Tuple[str, int]]:
     try:
-        api = HfApi()
         files = list_repo_files(repo_id, repo_type="dataset")
         hf_datasets = set()
         for file in files:
@@ -174,7 +178,7 @@ def generate_readme(hf_datasets: Set[Tuple[str, int]]) -> str:
     ticker_list = []
     for ticker in sorted(ticker_datasets.keys()):
         levels = sorted(ticker_datasets[ticker])
-        levels_str = ", ".join(str(l) for l in levels)
+        levels_str = ", ".join(str(level) for level in levels)
         ticker_list.append(f"- **{ticker}**: {levels_str} levels")
 
     # Generate YAML configuration for dataset viewer
@@ -392,7 +396,7 @@ def main():
     if (
         not args.dry_run
         and not args.download_only
-        and (ready_to_upload or missing_from_hf)
+        and (ready_to_upload or missing_from_hf or args.force_readme)
     ):
         print("Updating metadata...")
         print()
