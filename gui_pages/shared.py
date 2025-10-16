@@ -226,8 +226,8 @@ def get_available_tickers(sample_files: dict) -> dict:
 def init_session_state():
     if "selected_ticker" not in st.session_state:
         # Don't call get_available_tickers during init to avoid triggering downloads
-        # Just set a default that will be validated later
-        st.session_state.selected_ticker = "SPY (30 levels)"
+        # Use MSFT (30 levels) as default - smaller than SPY for faster initial load
+        st.session_state.selected_ticker = "MSFT (30 levels)"
     if "current_idx" not in st.session_state:
         st.session_state.current_idx = 0
     if "messages" not in st.session_state:
@@ -236,6 +236,8 @@ def init_session_state():
         st.session_state.orderbook = None
     if "data_source" not in st.session_state:
         st.session_state.data_source = "Hugging Face" if USE_HUGGINGFACE else "Local"
+    if "data_loaded" not in st.session_state:
+        st.session_state.data_loaded = False
 
 
 def load_ticker_data():
@@ -258,36 +260,48 @@ def load_ticker_data():
         key="ticker_selector",
     )
 
+    # If ticker changed, reset state
     if selected_ticker != st.session_state.selected_ticker:
         st.session_state.selected_ticker = selected_ticker
         st.session_state.current_idx = 0
         st.session_state.messages = None
         st.session_state.orderbook = None
+        st.session_state.data_loaded = False
 
     msg_path, ob_path = available_tickers[selected_ticker]
 
-    try:
-        if st.session_state.messages is None or st.session_state.orderbook is None:
-            with st.spinner(f"Loading LOBSTER data from {data_source}..."):
+    # Add explicit load button if data not loaded
+    if not st.session_state.data_loaded:
+        st.sidebar.markdown("---")
+        if st.sidebar.button("📥 Load Data", type="primary", use_container_width=True):
+            try:
+                with st.spinner(f"Loading LOBSTER data from {data_source}..."):
+                    if USE_HUGGINGFACE:
+                        messages, orderbook = load_data_from_hf(
+                            msg_path, ob_path, HF_REPO_ID
+                        )
+                    else:
+                        messages, orderbook = load_data(msg_path, ob_path)
+                    st.session_state.messages = messages
+                    st.session_state.orderbook = orderbook
+                    st.session_state.data_loaded = True
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Error loading data: {e}")
                 if USE_HUGGINGFACE:
-                    messages, orderbook = load_data_from_hf(
-                        msg_path, ob_path, HF_REPO_ID
-                    )
-                else:
-                    messages, orderbook = load_data(msg_path, ob_path)
-                st.session_state.messages = messages
-                st.session_state.orderbook = orderbook
-        else:
-            messages = st.session_state.messages
-            orderbook = st.session_state.orderbook
+                    st.error(f"Repository: {HF_REPO_ID}")
+                st.error(f"Message path: {msg_path}")
+                st.error(f"Orderbook path: {ob_path}")
+                return None, None, available_tickers
 
-        st.sidebar.success(f"Loaded {len(messages):,} events")
-        return messages, orderbook, available_tickers
-
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        if USE_HUGGINGFACE:
-            st.error(f"Repository: {HF_REPO_ID}")
-        st.error(f"Message path: {msg_path}")
-        st.error(f"Orderbook path: {ob_path}")
+        st.info("👆 Click 'Load Data' to begin")
         return None, None, available_tickers
+
+    # Data is loaded, return it
+    messages = st.session_state.messages
+    orderbook = st.session_state.orderbook
+
+    if messages is not None and orderbook is not None:
+        st.sidebar.success(f"✓ Loaded {len(messages):,} events")
+
+    return messages, orderbook, available_tickers

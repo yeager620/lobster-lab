@@ -14,10 +14,27 @@ from .shared import (
 )
 
 
-def reconstruct_order_book_state(messages: pd.DataFrame, up_to_idx: int) -> Dict:
+def reconstruct_order_book_state(
+    messages: pd.DataFrame, up_to_idx: int, max_lookback: int = 50000
+) -> Dict:
+    """
+    Reconstruct order book state with windowed processing for memory efficiency.
+
+    Args:
+        messages: Message DataFrame
+        up_to_idx: Index to reconstruct up to
+        max_lookback: Maximum number of messages to process (default 50k for memory efficiency)
+
+    Returns:
+        Dictionary with bids and asks order books
+    """
     order_book = {"bids": {}, "asks": {}}
 
-    for i in range(min(up_to_idx + 1, len(messages))):
+    # Use windowed reconstruction to avoid processing millions of messages
+    # Start from max(0, up_to_idx - max_lookback) to limit memory usage
+    start_idx = max(0, up_to_idx - max_lookback)
+
+    for i in range(start_idx, min(up_to_idx + 1, len(messages))):
         msg = messages.iloc[i]
         msg_type = int(msg["type"])
         order_id = int(msg["order_id"])
