@@ -30,17 +30,17 @@ jobs:
           git config --global user.name "github-actions[bot]"
 
           if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE_NAME" ]; then
-            echo "⚠️  HuggingFace deployment skipped: missing secrets"
+            echo "HuggingFace deployment skipped: missing secrets"
             echo "Add HF_TOKEN and HF_SPACE_NAME to repository secrets"
             exit 0
           fi
 
           if [ ! -f "README_HF.md" ]; then
-            echo "⚠️  HuggingFace deployment skipped: README_HF.md not found"
+            echo "HuggingFace deployment skipped: README_HF.md not found"
             exit 0
           fi
 
-          echo "🚀 Deploying to HF Space: $HF_SPACE_NAME"
+          echo "Deploying to HF Space: $HF_SPACE_NAME"
 
           # Clone repository
           git clone . hf-deploy --branch main
@@ -60,7 +60,7 @@ jobs:
           cd ..
           rm -rf hf-deploy
 
-          echo "✅ HuggingFace deployment complete!"
+          echo "HuggingFace deployment complete!"
 
       - name: Trigger Streamlit Cloud Deployment
         env:

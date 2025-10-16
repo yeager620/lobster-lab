@@ -8,28 +8,21 @@ font = "sans serif"
 [server]
 headless = true
 port = 8501
-# Performance optimizations
 maxUploadSize = 200
 enableCORS = false
 enableXsrfProtection = true
-# Run script faster by reducing overhead
 runOnSave = false
 
 [browser]
 gatherUsageStats = false
 
 [runner]
-# Faster reruns by not recreating session state
 fastReruns = true
-# Optimize session state handling
 postScriptGC = true
 
 [client]
-# Show error details for debugging
 showErrorDetails = true
-# Disconnect slower clients to free resources
 disconnectSlowClients = true
 
 [logger]
-# Reduce logging overhead in production
 level = "warning"

@@ -53,7 +53,6 @@ def create_candlestick_data(
 def compute_mid_prices(orderbook: pd.DataFrame, start_idx: int, end_idx: int) -> tuple:
     """Pre-compute mid prices for a window to avoid repeated calculations."""
     mid_prices = []
-    times = []
 
     ob_window = orderbook.iloc[start_idx:end_idx]
     for i in range(len(ob_window)):
@@ -356,7 +355,7 @@ def show():
         ticker_name=st.session_state.selected_ticker,
     )
     st.plotly_chart(
-        fig_candle, width="stretch", key=f"l1_candle_{current_idx}", config={}
+        fig_candle, use_container_width=True, key=f"l1_candle_{current_idx}", config={}
     )
 
     st.markdown("---")
@@ -367,5 +366,5 @@ def show():
         messages, orderbook, current_idx, window_size=chart_window
     )
     st.plotly_chart(
-        fig_volume, width="stretch", key=f"l1_volume_{current_idx}", config={}
+        fig_volume, use_container_width=True, key=f"l1_volume_{current_idx}", config={}
     )

@@ -14,6 +14,40 @@ from .shared import (
 )
 
 
+def update_order_book(order_book: Dict, msg: pd.Series) -> Dict:
+    msg_type = int(msg["type"])
+    order_id = int(msg["order_id"])
+    size = int(msg["size"])
+    price = msg["price"] / 10000.0
+    direction = int(msg["direction"])
+    time = msg["time"]
+
+    side = "bids" if direction == 1 else "asks"
+
+    if msg_type == 1:
+        order_book[side][order_id] = {
+            "price": price,
+            "size": size,
+            "time": time,
+            "initial_size": size,
+        }
+    elif msg_type == 2:
+        if order_id in order_book[side]:
+            order_book[side][order_id]["size"] -= size
+            if order_book[side][order_id]["size"] <= 0:
+                del order_book[side][order_id]
+    elif msg_type == 3:
+        if order_id in order_book[side]:
+            del order_book[side][order_id]
+    elif msg_type in [4, 5]:
+        if order_id in order_book[side]:
+            order_book[side][order_id]["size"] -= size
+            if order_book[side][order_id]["size"] <= 0:
+                del order_book[side][order_id]
+
+    return order_book
+
+
 @st.cache_data(show_spinner=False)
 def reconstruct_order_book_state(
     messages: pd.DataFrame, up_to_idx: int, max_lookback: int = 50000
@@ -24,35 +58,7 @@ def reconstruct_order_book_state(
 
     for i in range(start_idx, min(up_to_idx + 1, len(messages))):
         msg = messages.iloc[i]
-        msg_type = int(msg["type"])
-        order_id = int(msg["order_id"])
-        size = int(msg["size"])
-        price = msg["price"] / 10000.0
-        direction = int(msg["direction"])
-        time = msg["time"]
-
-        side = "bids" if direction == 1 else "asks"
-
-        if msg_type == 1:
-            order_book[side][order_id] = {
-                "price": price,
-                "size": size,
-                "time": time,
-                "initial_size": size,
-            }
-        elif msg_type == 2:
-            if order_id in order_book[side]:
-                order_book[side][order_id]["size"] -= size
-                if order_book[side][order_id]["size"] <= 0:
-                    del order_book[side][order_id]
-        elif msg_type == 3:
-            if order_id in order_book[side]:
-                del order_book[side][order_id]
-        elif msg_type in [4, 5]:
-            if order_id in order_book[side]:
-                order_book[side][order_id]["size"] -= size
-                if order_book[side][order_id]["size"] <= 0:
-                    del order_book[side][order_id]
+        order_book = update_order_book(order_book, msg)
 
     return order_book
 
@@ -96,7 +102,7 @@ def format_order_queue_table(
                     "Price": f"${price:.2f}",
                     "Queue Pos": f"{i + 1}/{len(orders_sorted)}",
                     "Order ID": order["id"],
-                    "Size": f"{order['size']:,}",
+                    "Size": f'{order['size']:,}',
                     "Time": seconds_to_eastern_time(order["time"], date_str),
                 }
             )
@@ -393,24 +399,9 @@ def plot_order_flow_rate(
     return fig
 
 
-def show():
-    apply_global_styles()
-    st.title("L3")
-    st.markdown(
-        "**Market by order: Order Book Visualizer with order queue position tracking**"
-    )
-
-    init_session_state()
-    messages, orderbook, available_tickers = load_ticker_data()
-
-    if messages is None:
-        st.error(
-            "No LOBSTER data files found. Please ensure sample data directories exist."
-        )
-        return
-
+def render_sidebar(state):
     st.sidebar.header("Playback Controls")
-    max_idx = len(messages) - 1
+    max_idx = len(st.session_state.messages) - 1
 
     if st.session_state.current_idx > max_idx:
         st.session_state.current_idx = max_idx
@@ -479,7 +470,7 @@ def show():
             target_type = event_type[0]
             found_idx = None
             for i in range(st.session_state.current_idx - 1, -1, -1):
-                if int(messages.iloc[i]["type"]) == target_type:
+                if int(st.session_state.messages.iloc[i]["type"]) == target_type:
                     found_idx = i
                     break
 
@@ -498,8 +489,8 @@ def show():
         if st.button("Next", key="l3_btn_next_event", use_container_width=True):
             target_type = event_type[0]
             found_idx = None
-            for i in range(st.session_state.current_idx + 1, len(messages)):
-                if int(messages.iloc[i]["type"]) == target_type:
+            for i in range(st.session_state.current_idx + 1, len(st.session_state.messages)):
+                if int(st.session_state.messages.iloc[i]["type"]) == target_type:
                     found_idx = i
                     break
 
@@ -550,9 +541,11 @@ def show():
     )
 
     st.sidebar.markdown("---")
+    return display_levels
 
-    current_idx = st.session_state.current_idx
-    current_msg = messages.iloc[current_idx]
+
+def render_main_content(state, display_levels):
+    current_msg = st.session_state.messages.iloc[st.session_state.current_idx]
 
     message_types = {
         1: ("New Limit Order", "blue"),
@@ -566,11 +559,16 @@ def show():
         int(current_msg["type"]), ("Unknown", "gray")
     )
 
-    st.markdown(f"### Event #{current_idx:,} / {len(messages):,}")
+    st.markdown(f"### Event #{st.session_state.current_idx:,} / {len(st.session_state.messages):,}")
     st.markdown(f"**Event Type:** :{msg_type_color}[{msg_type_text}]")
 
     with st.spinner("Reconstructing order book state..."):
-        order_book = reconstruct_order_book_state(messages, current_idx)
+        if st.session_state.order_book is None or st.session_state.current_idx == 0:
+            st.session_state.order_book = reconstruct_order_book_state(st.session_state.messages, st.session_state.current_idx)
+        else:
+            st.session_state.order_book = update_order_book(st.session_state.order_book, current_msg)
+
+    order_book = st.session_state.order_book
 
     st.markdown("---")
     st.markdown("### Current Order Book State")
@@ -594,7 +592,7 @@ def show():
     fig_depth, bid_levels, ask_levels = plot_order_book_depth_with_queue(
         order_book, levels=display_levels
     )
-    st.plotly_chart(fig_depth, width="stretch", key=f"l3_depth_{current_idx}")
+    st.plotly_chart(fig_depth, use_container_width=True, key=f"l3_depth_{st.session_state.current_idx}")
 
     st.markdown("#### Order Queue Details")
     date_str = get_dataset_date(st.session_state.selected_ticker)
@@ -604,7 +602,7 @@ def show():
         st.markdown("**Bid Queue (FIFO Order)**")
         bid_table = format_order_queue_table(bid_levels, "bid", date_str)
         if not bid_table.empty:
-            st.dataframe(bid_table, width="stretch", hide_index=True)
+            st.dataframe(bid_table, use_container_width=True, hide_index=True)
         else:
             st.write("No bid orders")
 
@@ -612,7 +610,7 @@ def show():
         st.markdown("**Ask Queue (FIFO Order)**")
         ask_table = format_order_queue_table(ask_levels, "ask", date_str)
         if not ask_table.empty:
-            st.dataframe(ask_table, width="stretch", hide_index=True)
+            st.dataframe(ask_table, use_container_width=True, hide_index=True)
         else:
             st.write("No ask orders")
 
@@ -623,12 +621,12 @@ def show():
     with col1:
         st.markdown("### Order Size Distribution")
         fig_sizes = plot_order_size_distribution(order_book)
-        st.plotly_chart(fig_sizes, width="stretch", config={})
+        st.plotly_chart(fig_sizes, use_container_width=True, config={})
 
     with col2:
         st.markdown("### Order Arrival Rate")
-        fig_flow = plot_order_flow_rate(messages, window=100, date_str=date_str)
-        st.plotly_chart(fig_flow, width="stretch", config={})
+        fig_flow = plot_order_flow_rate(st.session_state.messages, window=100, date_str=date_str)
+        st.plotly_chart(fig_flow, use_container_width=True, config={})
 
     st.markdown("---")
 
@@ -638,8 +636,8 @@ def show():
     )
 
     if order_id_input > 0:
-        fig_timeline = plot_order_timeline(messages, order_id_input, date_str)
-        st.plotly_chart(fig_timeline, width="stretch", config={})
+        fig_timeline = plot_order_timeline(st.session_state.messages, order_id_input, date_str)
+        st.plotly_chart(fig_timeline, use_container_width=True, config={})
 
     with st.expander("View Complete Order Book (L3)"):
         col1, col2 = st.columns(2)
@@ -648,7 +646,7 @@ def show():
             if order_book["bids"]:
                 bid_df = pd.DataFrame.from_dict(order_book["bids"], orient="index")
                 bid_df = bid_df.sort_values("price", ascending=False)
-                st.dataframe(bid_df, width="stretch")
+                st.dataframe(bid_df, use_container_width=True)
             else:
                 st.write("No bid orders")
 
@@ -657,6 +655,26 @@ def show():
             if order_book["asks"]:
                 ask_df = pd.DataFrame.from_dict(order_book["asks"], orient="index")
                 ask_df = ask_df.sort_values("price")
-                st.dataframe(ask_df, width="stretch")
+                st.dataframe(ask_df, use_container_width=True)
             else:
                 st.write("No ask orders")
+
+
+def show():
+    apply_global_styles()
+    st.title("L3")
+    st.markdown(
+        "**Market by order: Order Book Visualizer with order queue position tracking**"
+    )
+
+    init_session_state()
+    messages, orderbook, available_tickers = load_ticker_data()
+
+    if messages is None:
+        st.error(
+            "No LOBSTER data files found. Please ensure sample data directories exist."
+        )
+        return
+
+    display_levels = render_sidebar(st.session_state)
+    render_main_content(st.session_state, display_levels)

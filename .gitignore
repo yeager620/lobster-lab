@@ -1,49 +1,40 @@
-# Python
-__pycache__/
+*__pycache__
 *.py[cod]
 *$py.class
 *.so
 .Python
 
-# Build artifacts
-build/
-dist/
-wheels/
+*build/
+*dist/
+*wheels/
 *.egg-info/
 *.egg
 
-# Virtual environments
-.venv/
-venv/
+*.venv/
+*venv/
 ENV/
 env/
 
-# IDEs
-.idea/
+*.idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# OS
-.DS_Store
+*.DS_Store
 Thumbs.db
 
-# Environment
 *.env
 .env.*
 !.env.example
 
-# Streamlit
-.streamlit/*
-!.streamlit/config.toml
+# .streamlit/*
+# !.streamlit/config.toml
 
-# Data files
 LOBSTER_SampleFile_*/
 *.csv
 !scripts/*.csv
 
-# Temporary files
 *.tmp
 *.log
 /GEMINI.md
