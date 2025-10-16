@@ -548,6 +548,35 @@ def render_sidebar(state):
     return display_levels
 
 
+def _ensure_order_book_state(messages: pd.DataFrame, target_idx: int) -> Dict:
+    if "order_book_last_idx" not in st.session_state:
+        st.session_state.order_book_last_idx = None
+
+    last_idx = st.session_state.order_book_last_idx
+    order_book = st.session_state.order_book
+
+    if order_book is None or last_idx is None:
+        order_book = reconstruct_order_book_state(messages, target_idx)
+        st.session_state.order_book = order_book
+        st.session_state.order_book_last_idx = target_idx
+        return order_book
+
+    if target_idx < last_idx:
+        order_book = reconstruct_order_book_state(messages, target_idx)
+        st.session_state.order_book = order_book
+        st.session_state.order_book_last_idx = target_idx
+        return order_book
+
+    if target_idx > last_idx:
+        for idx in range(last_idx + 1, target_idx + 1):
+            msg = messages.iloc[idx]
+            order_book = update_order_book(order_book, msg)
+        st.session_state.order_book = order_book
+        st.session_state.order_book_last_idx = target_idx
+
+    return order_book
+
+
 def render_main_content(state, display_levels):
     current_msg = st.session_state.messages.iloc[st.session_state.current_idx]
 
@@ -567,12 +596,9 @@ def render_main_content(state, display_levels):
     st.markdown(f"**Event Type:** :{msg_type_color}[{msg_type_text}]")
 
     with st.spinner("Reconstructing order book state..."):
-        if st.session_state.order_book is None or st.session_state.current_idx == 0:
-            st.session_state.order_book = reconstruct_order_book_state(st.session_state.messages, st.session_state.current_idx)
-        else:
-            st.session_state.order_book = update_order_book(st.session_state.order_book, current_msg)
-
-    order_book = st.session_state.order_book
+        order_book = _ensure_order_book_state(
+            st.session_state.messages, st.session_state.current_idx
+        )
 
     st.markdown("---")
     st.markdown("### Current Order Book State")
@@ -675,6 +701,8 @@ def show():
 
     if "order_book" not in st.session_state:
         st.session_state.order_book = None
+    if "order_book_last_idx" not in st.session_state:
+        st.session_state.order_book_last_idx = None
 
     messages, orderbook, available_tickers = load_ticker_data()
 

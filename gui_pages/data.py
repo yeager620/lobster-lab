@@ -116,6 +116,8 @@ def init_session_state():
         st.session_state.messages = None
     if "orderbook" not in st.session_state:
         st.session_state.orderbook = None
+    if "order_book_last_idx" not in st.session_state:
+        st.session_state.order_book_last_idx = None
     if "data_source" not in st.session_state:
         st.session_state.data_source = "Hugging Face" if USE_HUGGINGFACE else "Local"
     if "data_loaded" not in st.session_state:
@@ -142,6 +144,7 @@ def load_ticker_data():
         st.session_state.messages = None
         st.session_state.orderbook = None
         st.session_state.order_book = None
+        st.session_state.order_book_last_idx = None
         st.session_state.data_loaded = False
 
     st.sidebar.selectbox(

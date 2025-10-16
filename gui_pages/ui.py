@@ -1,58 +1,56 @@
 import streamlit as st
 from typing import Tuple, Any, Iterable
 
+
 def apply_global_styles() -> None:
-    _GLOBAL_STYLE = """
-<style>
-/* Establish responsive typography that scales with viewport width */
-:root {
-    --lobster-lab-h1: clamp(2.0rem, 2.4vw + 0.8rem, 3.2rem);
-    --lobster-lab-h2: clamp(1.6rem, 1.9vw + 0.6rem, 2.4rem);
-    --lobster-lab-h3: clamp(1.35rem, 1.4vw + 0.55rem, 1.9rem);
-    --lobster-lab-text: clamp(0.95rem, 0.95vw + 0.55rem, 1.1rem);
-}
+    global_style = """
+    <style>
+    :root {
+        --lobster-lab-h1: clamp(2.0rem, 2.4vw + 0.8rem, 3.2rem);
+        --lobster-lab-h2: clamp(1.6rem, 1.9vw + 0.6rem, 2.4rem);
+        --lobster-lab-h3: clamp(1.35rem, 1.4vw + 0.55rem, 1.9rem);
+        --lobster-lab-text: clamp(0.95rem, 0.95vw + 0.55rem, 1.1rem);
+    }
 
-h1, h2, h3, h4, h5, h6 {
-    font-weight: 600 !important;
-    line-height: 1.2 !important;
-    margin-bottom: 0.75rem !important;
-}
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        margin-bottom: 0.75rem !important;
+    }
 
-h1 { font-size: var(--lobster-lab-h1) !important; }
-h2 { font-size: var(--lobster-lab-h2) !important; }
-h3 { font-size: var(--lobster-lab-h3) !important; }
-p, li, span, label {
-    font-size: var(--lobster-lab-text) !important;
-    line-height: 1.5 !important;
-}
+    h1 { font-size: var(--lobster-lab-h1) !important; }
+    h2 { font-size: var(--lobster-lab-h2) !important; }
+    h3 { font-size: var(--lobster-lab-h3) !important; }
+    p, li, span, label {
+        font-size: var(--lobster-lab-text) !important;
+        line-height: 1.5 !important;
+    }
 
-/* Allow sidebar text to wrap gracefully */
-[data-testid="stSidebar"] p,
-[data-testid="stSidebar"] label {
-    white-space: normal !important;
-}
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label {
+        white-space: normal !important;
+    }
 
-/* Harmonise metric widgets so long values do not overflow */
-[data-testid="stMetricValue"] {
-    font-size: clamp(1.1rem, 1.4vw + 0.6rem, 1.8rem) !important;
-    line-height: 1.15 !important;
-    word-break: break-word !important;
-}
+    [data-testid="stMetricValue"] {
+        font-size: clamp(1.1rem, 1.4vw + 0.6rem, 1.8rem) !important;
+        line-height: 1.15 !important;
+        word-break: break-word !important;
+    }
 
-[data-testid="stMetricLabel"] {
-    font-size: clamp(0.75rem, 0.8vw + 0.45rem, 1.05rem) !important;
-    white-space: normal !important;
-    line-height: 1.2 !important;
-}
+    [data-testid="stMetricLabel"] {
+        font-size: clamp(0.75rem, 0.8vw + 0.45rem, 1.05rem) !important;
+        white-space: normal !important;
+        line-height: 1.2 !important;
+    }
 
-/* Reduce excess spacing inside Streamlit containers */
-section[data-testid="stHorizontalBlock"] > div {
-    padding-top: 0.25rem !important;
-    padding-bottom: 0.25rem !important;
-}
-</style>
-"""
-    st.markdown(_GLOBAL_STYLE, unsafe_allow_html=True)
+    section[data-testid="stHorizontalBlock"] > div {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+    }
+    </style>
+    """
+
+    st.markdown(global_style, unsafe_allow_html=True)
 
 def render_metrics_grid(
     metrics: Iterable[Tuple[str, Any]],
@@ -199,20 +197,3 @@ def render_sidebar():
         st.session_state.current_idx = manual_idx
         st.session_state.last_search_result = None
         st.rerun()
-t;
-}
-
-[data-testid="stMetricLabel"] {
-    font-size: clamp(0.75rem, 0.8vw + 0.45rem, 1.05rem) !important;
-    white-space: normal !important;
-    line-height: 1.2 !important;
-}
-
-/* Reduce excess spacing inside Streamlit containers */
-section[data-testid="stHorizontalBlock"] > div {
-    padding-top: 0.25rem !important;
-    padding-bottom: 0.25rem !important;
-}
-</style>
-"""
-    st.markdown(_GLOBAL_STYLE, unsafe_allow_html=True)
