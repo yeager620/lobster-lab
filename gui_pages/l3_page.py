@@ -59,12 +59,9 @@ def reconstruct_order_book_state(
 def _sample_queue_color(
     colorscale: str, queue_idx: int, queue_length: int, fallback: str
 ) -> str:
-    """Sample a color along a Plotly colorscale with defensive fallbacks."""
-
     if queue_length <= 1:
         position = 0.0
     else:
-        # Normalize the queue index to the 0-1 range while guarding against FP drift
         denominator = max(queue_length - 1, 1)
         position = min(max(queue_idx / denominator, 0.0), 1.0)
 
@@ -75,7 +72,6 @@ def _sample_queue_color(
     except (ValueError, TypeError, IndexError):
         pass
 
-    # Fallback: use the last color in the named colorscale if available, otherwise default
     try:
         resolved_scale = pc.get_colorscale(colorscale)
         if resolved_scale:
@@ -135,35 +131,32 @@ def plot_order_book_depth_with_queue(
                     marker=dict(color="rgba(0, 180, 0, 0.7)"),
                     hovertemplate="%{customdata}<extra></extra>",
                     customdata=["<br>".join(hover_lines)],
-                    showlegend=True if idx == 0 else False,  
+                    showlegend=True if idx == 0 else False,
                     legendgroup="bids",
-                    width=[0.004], 
+                    width=[0.004],
                 )
             )
 
-            # Add vertical lines to mark individual order boundaries
             cumulative = 0
             for order in orders_sorted:
                 cumulative += order["size"]
-                if cumulative < total_size:  # Don't draw line at the very end
+                if cumulative < total_size:
                     fig.add_shape(
                         type="line",
                         x0=cumulative,
                         x1=cumulative,
                         y0=float(price) - 0.003,
-                        y1=float(price) + 0.003,  # Small vertical line
+                        y1=float(price) + 0.003,
                         line=dict(color="rgba(255, 255, 255, 0.6)", width=2),
                         layer="above",
                     )
 
-    # Ask side - aggregate bars with individual order segments
     if ask_levels:
         for idx, (price, orders) in enumerate(ask_levels):
             orders_sorted = sorted(orders, key=lambda x: x["time"])
             total_size = sum(o["size"] for o in orders_sorted)
             queue_length = len(orders_sorted)
 
-            # Create hover text with queue details
             hover_lines = [
                 f"<b>Ask @ ${float(price):.2f}</b>",
                 f"Total Size: {total_size:,} shares",
@@ -171,7 +164,6 @@ def plot_order_book_depth_with_queue(
                 "<br><b>Queue Details:</b>",
             ]
 
-            # Show top 5 orders in queue
             for i, order in enumerate(orders_sorted[:5]):
                 hover_lines.append(
                     f"  #{i + 1}: {order['size']:,} sh (ID: {order['id']})"
@@ -179,7 +171,6 @@ def plot_order_book_depth_with_queue(
             if len(orders_sorted) > 5:
                 hover_lines.append(f"  ... and {len(orders_sorted) - 5} more")
 
-            # Add main bar for total size
             fig.add_trace(
                 go.Bar(
                     x=[total_size],
@@ -189,28 +180,26 @@ def plot_order_book_depth_with_queue(
                     marker=dict(color="rgba(255, 50, 50, 0.7)"),
                     hovertemplate="%{customdata}<extra></extra>",
                     customdata=["<br>".join(hover_lines)],
-                    showlegend=True if idx == 0 else False,  # Only show legend once
+                    showlegend=True if idx == 0 else False,
                     legendgroup="asks",
-                    width=[0.004],  # Uniform bar thickness in price units (~$0.004)
+                    width=[0.004],
                 )
             )
 
-            # Add vertical lines to mark individual order boundaries
             cumulative = 0
             for order in orders_sorted:
                 cumulative += order["size"]
-                if cumulative < total_size:  # Don't draw line at the very end
+                if cumulative < total_size:
                     fig.add_shape(
                         type="line",
                         x0=cumulative,
                         x1=cumulative,
                         y0=float(price) - 0.003,
-                        y1=float(price) + 0.003,  # Small vertical line
+                        y1=float(price) + 0.003,
                         line=dict(color="rgba(255, 255, 255, 0.6)", width=2),
                         layer="above",
                     )
 
-    # Calculate reasonable x-axis range
     max_size = 0
     if bid_levels:
         max_size = max(
@@ -226,7 +215,7 @@ def plot_order_book_depth_with_queue(
         xaxis_title="Shares",
         yaxis_title="Price ($)",
         barmode="overlay",
-        bargap=0.2,  # consistent spacing between price levels
+        bargap=0.2,
         bargroupgap=0.1,
         height=500,
         hovermode="closest",

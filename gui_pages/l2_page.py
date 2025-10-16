@@ -70,7 +70,9 @@ def plot_orderbook(
     if current_msg is not None and current_msg["type"] in [4, 5]:
         exec_price = float(current_msg["price"]) / 10000.0
         exec_size = int(current_msg["size"]) if pd.notna(current_msg["size"]) else 0
-        direction_val = int(current_msg["direction"]) if pd.notna(current_msg["direction"]) else 0
+        direction_val = (
+            int(current_msg["direction"]) if pd.notna(current_msg["direction"]) else 0
+        )
         direction = "BUY" if direction_val == -1 else "SELL"
         fig.add_hline(
             y=float(exec_price),

@@ -103,7 +103,6 @@ def render_metrics_grid(
     *,
     columns: int = 3,
 ) -> None:
-
     items = list(metrics)
     if not items:
         return
