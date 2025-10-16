@@ -280,6 +280,7 @@ def load_ticker_data():
         st.session_state.current_idx = 0
         st.session_state.messages = None
         st.session_state.orderbook = None
+        st.session_state.order_book = None
         st.session_state.data_loaded = False
 
     st.sidebar.selectbox(

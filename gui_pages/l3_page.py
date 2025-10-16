@@ -668,6 +668,10 @@ def show():
     )
 
     init_session_state()
+
+    if "order_book" not in st.session_state:
+        st.session_state.order_book = None
+
     messages, orderbook, available_tickers = load_ticker_data()
 
     if messages is None:
