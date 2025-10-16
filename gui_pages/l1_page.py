@@ -22,6 +22,14 @@ from .ui import (
 )
 
 
+def _polars_groupby(df: pl.DataFrame, *args, **kwargs):
+    """Compatibility helper for Polars group-by behavior."""
+
+    if hasattr(df, "group_by"):
+        return df.group_by(*args, **kwargs)
+    return df.groupby(*args, **kwargs)
+
+
 def _get_cache(name: str, max_entries: int = 64) -> OrderedDict:
     cache = st.session_state.setdefault(name, OrderedDict())
     while len(cache) > max_entries:
@@ -287,16 +295,14 @@ def _compute_volume_profile_polars(
     )
 
     buy_profile = (
-        enriched.filter(pl.col("direction") == 1)
-        .groupby("price_level")
+        _polars_groupby(enriched.filter(pl.col("direction") == 1), "price_level")
         .agg(size=pl.col("size").sum())
         .sort("price_level")
         .to_pandas(use_pyarrow_extension_array=False)
     )
 
     sell_profile = (
-        enriched.filter(pl.col("direction") == -1)
-        .groupby("price_level")
+        _polars_groupby(enriched.filter(pl.col("direction") == -1), "price_level")
         .agg(size=pl.col("size").sum())
         .sort("price_level")
         .to_pandas(use_pyarrow_extension_array=False)
