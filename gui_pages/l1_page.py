@@ -98,7 +98,7 @@ def _create_candlestick_data_polars(
         return None
 
     candles = (
-        enriched.groupby("bucket")
+        enriched.group_by("bucket")
         .agg(
             time=pl.col("time").first(),
             open=pl.col("mid").first(),
@@ -475,7 +475,7 @@ def show():
         ticker_name=st.session_state.selected_ticker,
     )
     st.plotly_chart(
-        fig_candle, use_container_width=True, key=f"l1_candle_{current_idx}", config={}
+        fig_candle, width="stretch", key=f"l1_candle_{current_idx}", config={}
     )
 
     st.markdown("---")
@@ -486,5 +486,5 @@ def show():
         messages, orderbook, current_idx, window_size=chart_window
     )
     st.plotly_chart(
-        fig_volume, use_container_width=True, key=f"l1_volume_{current_idx}", config={}
+        fig_volume, width="stretch", key=f"l1_volume_{current_idx}", config={}
     )

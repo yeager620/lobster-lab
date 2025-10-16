@@ -269,7 +269,7 @@ def show():
     if not bids.empty and not asks.empty:
         fig_ob = plot_orderbook(bids, asks, current_msg)
         st.plotly_chart(
-            fig_ob, use_container_width=True, key=f"orderbook_chart_{current_idx}", config={}
+            fig_ob, width="stretch", key=f"orderbook_chart_{current_idx}", config={}
         )
     else:
         st.warning("No valid order book data at this index.")
@@ -278,8 +278,8 @@ def show():
         col1, col2 = st.columns(2)
         with col1:
             st.write("**Message Data**")
-            st.dataframe(current_msg.to_frame(), use_container_width=True)
+            st.dataframe(current_msg.to_frame(), width="stretch")
         with col2:
             st.write("**Order Book Data (First 10 levels)**")
             ob_display = current_ob.to_frame().head(40)
-            st.dataframe(ob_display, use_container_width=True)
+            st.dataframe(ob_display, width="stretch")

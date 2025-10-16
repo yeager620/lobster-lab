@@ -105,7 +105,7 @@ def render_sidebar(*, playback_enabled: bool = True) -> None:
 
         play_label = "Pause" if st.session_state.is_playing else "Play"
         if st.sidebar.button(
-            play_label, key="play_pause_button", use_container_width=True
+            play_label, key="play_pause_button", width="stretch"
         ):
             st.session_state.is_playing = not st.session_state.is_playing
             st.rerun()
@@ -114,34 +114,34 @@ def render_sidebar(*, playback_enabled: bool = True) -> None:
     nav_col1, nav_col2 = st.sidebar.columns([1, 1])
 
     with nav_col1:
-        if st.button(f"-{step_size}", key="btn_back", use_container_width=True):
+        if st.button(f"-{step_size}", key="btn_back", width="stretch"):
             st.session_state.current_idx = max(
                 0, st.session_state.current_idx - step_size
             )
             st.session_state.is_playing = False
             st.rerun()
 
-        if st.button("-1", key="btn_back_one", use_container_width=True):
+        if st.button("-1", key="btn_back_one", width="stretch"):
             st.session_state.current_idx = max(0, st.session_state.current_idx - 1)
             st.session_state.is_playing = False
             st.rerun()
 
     with nav_col2:
-        if st.button(f"+{step_size}", key="btn_next", use_container_width=True):
+        if st.button(f"+{step_size}", key="btn_next", width="stretch"):
             st.session_state.current_idx = min(
                 max_idx, st.session_state.current_idx + step_size
             )
             st.session_state.is_playing = False
             st.rerun()
 
-        if st.button("+1", key="btn_next_one", use_container_width=True):
+        if st.button("+1", key="btn_next_one", width="stretch"):
             st.session_state.current_idx = min(
                 max_idx, st.session_state.current_idx + 1
             )
             st.session_state.is_playing = False
             st.rerun()
 
-    if st.sidebar.button("Reset to Start", key="btn_reset", use_container_width=True):
+    if st.sidebar.button("Reset to Start", key="btn_reset", width="stretch"):
         st.session_state.current_idx = 0
         st.session_state.is_playing = False
         st.rerun()
@@ -177,7 +177,7 @@ def render_sidebar(*, playback_enabled: bool = True) -> None:
 
     event_col1, event_col2 = st.sidebar.columns(2)
     with event_col1:
-        if st.button("Prev", key="btn_prev_event", use_container_width=True):
+        if st.button("Prev", key="btn_prev_event", width="stretch"):
             target_type = event_type[0]
             found_idx = None
             for i in range(st.session_state.current_idx - 1, -1, -1):
@@ -198,7 +198,7 @@ def render_sidebar(*, playback_enabled: bool = True) -> None:
                 )
 
     with event_col2:
-        if st.button("Next", key="btn_next_event", use_container_width=True):
+        if st.button("Next", key="btn_next_event", width="stretch"):
             target_type = event_type[0]
             found_idx = None
             for i in range(st.session_state.current_idx + 1, len(st.session_state.messages)):
