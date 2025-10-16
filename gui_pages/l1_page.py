@@ -1,9 +1,15 @@
-import streamlit as st
+from collections import OrderedDict
+
+import polars as pl
 import pandas as pd
 import plotly.graph_objects as go
+import streamlit as st
+
 from .data import (
     init_session_state,
     load_ticker_data,
+    get_polars_frames,
+    polars_window_to_pandas,
 )
 from .utils import (
     seconds_to_eastern_time,
@@ -16,8 +22,15 @@ from .ui import (
 )
 
 
+def _get_cache(name: str, max_entries: int = 64) -> OrderedDict:
+    cache = st.session_state.setdefault(name, OrderedDict())
+    while len(cache) > max_entries:
+        cache.popitem(last=False)
+    return cache
+
+
 @st.cache_data
-def create_candlestick_data(
+def _create_candlestick_data_pandas(
     messages: pd.DataFrame, orderbook: pd.DataFrame, window: int = 100
 ) -> pd.DataFrame:
 
@@ -48,6 +61,88 @@ def create_candlestick_data(
 
     return candles.reset_index(drop=True)
 
+
+def _create_candlestick_data_polars(
+    messages_pl: pl.DataFrame,
+    orderbook_pl: pl.DataFrame,
+    start_idx: int,
+    end_idx: int,
+    window: int,
+) -> pd.DataFrame | None:
+    if start_idx >= end_idx:
+        return None
+
+    length = end_idx - start_idx
+    msg_window = messages_pl.slice(start_idx, length)
+    ob_window = orderbook_pl.slice(start_idx, length).select(
+        ["bid_price_1", "ask_price_1"]
+    )
+
+    if ob_window.height == 0:
+        return None
+
+    bucket = max(window, 1)
+    enriched = (
+        ob_window.with_columns(
+            time=msg_window["time"],
+            mid=(pl.col("bid_price_1") + pl.col("ask_price_1")) / 20000.0,
+            bucket=(pl.arange(0, ob_window.height) // bucket),
+        )
+        .filter(
+            (pl.col("bid_price_1") > 0)
+            & (pl.col("ask_price_1") < 9_999_999_999)
+        )
+    )
+
+    if enriched.height == 0:
+        return None
+
+    candles = (
+        enriched.groupby("bucket")
+        .agg(
+            time=pl.col("time").first(),
+            open=pl.col("mid").first(),
+            high=pl.col("mid").max(),
+            low=pl.col("mid").min(),
+            close=pl.col("mid").last(),
+        )
+        .sort("time")
+        .select(["time", "open", "high", "low", "close"])
+    )
+
+    return candles.to_pandas(use_pyarrow_extension_array=False)
+
+
+def create_candlestick_data(
+    messages_window: pd.DataFrame,
+    orderbook_window: pd.DataFrame,
+    start_idx: int,
+    end_idx: int,
+    window: int = 100,
+) -> pd.DataFrame:
+    messages_pl, orderbook_pl = get_polars_frames()
+    data_cache_key = st.session_state.get("data_cache_key")
+    cache = _get_cache("candlestick_cache")
+    cache_key = (data_cache_key, start_idx, end_idx, window)
+
+    if cache_key in cache:
+        cache.move_to_end(cache_key)
+        return cache[cache_key]
+
+    if messages_pl is not None and orderbook_pl is not None:
+        candles = _create_candlestick_data_polars(
+            messages_pl, orderbook_pl, start_idx, end_idx, window
+        )
+        if candles is not None:
+            cache[cache_key] = candles
+            return candles
+
+    candles = _create_candlestick_data_pandas(
+        messages=messages_window, orderbook=orderbook_window, window=window
+    )
+    cache[cache_key] = candles
+    return candles
+
 def plot_price_candlestick(
     messages: pd.DataFrame,
     orderbook: pd.DataFrame,
@@ -58,11 +153,25 @@ def plot_price_candlestick(
     start_idx = max(0, current_idx - window_size)
     end_idx = min(len(messages), current_idx + window_size // 4)
 
-    msg_window = messages.iloc[start_idx:end_idx]
-    ob_window = orderbook.iloc[start_idx:end_idx]
+    messages_pl, orderbook_pl = get_polars_frames()
+    if messages_pl is not None:
+        msg_window = polars_window_to_pandas(messages_pl, start_idx, end_idx)
+    else:
+        msg_window = messages.iloc[start_idx:end_idx]
+
+    if orderbook_pl is not None:
+        ob_window = polars_window_to_pandas(orderbook_pl, start_idx, end_idx)
+    else:
+        ob_window = orderbook.iloc[start_idx:end_idx]
 
     candle_window = 50
-    candle_data = create_candlestick_data(msg_window, ob_window, window=candle_window)
+    candle_data = create_candlestick_data(
+        msg_window,
+        ob_window,
+        start_idx,
+        end_idx,
+        window=candle_window,
+    )
 
     date_str = get_dataset_date(ticker_name)
 
@@ -139,7 +248,7 @@ def plot_price_candlestick(
 
 
 @st.cache_data
-def compute_volume_profile(
+def _compute_volume_profile_pandas(
     messages: pd.DataFrame, start_idx: int, end_idx: int
 ) -> tuple:
     msg_window = messages.iloc[start_idx:end_idx]
@@ -156,6 +265,71 @@ def compute_volume_profile(
     buy_profile = exec_events_buy.groupby("price_level")["size"].sum().reset_index()
     sell_profile = exec_events_sell.groupby("price_level")["size"].sum().reset_index()
 
+    return exec_events, buy_profile, sell_profile
+
+
+def _compute_volume_profile_polars(
+    messages_pl: pl.DataFrame, start_idx: int, end_idx: int
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None]:
+    if start_idx >= end_idx:
+        return None, None, None
+
+    length = end_idx - start_idx
+    msg_window = messages_pl.slice(start_idx, length)
+    exec_events = msg_window.filter(pl.col("type").is_in([4, 5]))
+
+    if exec_events.height == 0:
+        return None, None, None
+
+    enriched = exec_events.with_columns(
+        price_level=(pl.col("price") / 10000.0).round(2),
+        price=pl.col("price") / 10000.0,
+    )
+
+    buy_profile = (
+        enriched.filter(pl.col("direction") == 1)
+        .groupby("price_level")
+        .agg(size=pl.col("size").sum())
+        .sort("price_level")
+        .to_pandas(use_pyarrow_extension_array=False)
+    )
+
+    sell_profile = (
+        enriched.filter(pl.col("direction") == -1)
+        .groupby("price_level")
+        .agg(size=pl.col("size").sum())
+        .sort("price_level")
+        .to_pandas(use_pyarrow_extension_array=False)
+    )
+
+    exec_pd = enriched.to_pandas(use_pyarrow_extension_array=False)
+    return exec_pd, buy_profile, sell_profile
+
+
+def compute_volume_profile(
+    messages: pd.DataFrame, start_idx: int, end_idx: int
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None]:
+    messages_pl, _ = get_polars_frames()
+    data_cache_key = st.session_state.get("data_cache_key")
+    cache = _get_cache("volume_profile_cache")
+    cache_key = (data_cache_key, start_idx, end_idx)
+
+    if cache_key in cache:
+        cache.move_to_end(cache_key)
+        return cache[cache_key]
+
+    if messages_pl is not None:
+        exec_events, buy_profile, sell_profile = _compute_volume_profile_polars(
+            messages_pl, start_idx, end_idx
+        )
+        if exec_events is not None:
+            cache[cache_key] = (exec_events, buy_profile, sell_profile)
+            return exec_events, buy_profile, sell_profile
+
+    exec_events, buy_profile, sell_profile = _compute_volume_profile_pandas(
+        messages, start_idx, end_idx
+    )
+    cache[cache_key] = (exec_events, buy_profile, sell_profile)
     return exec_events, buy_profile, sell_profile
 
 
@@ -253,6 +427,9 @@ def show():
         )
         return
 
+    render_sidebar(playback_enabled=False)
+
+    st.sidebar.markdown("---")
     st.sidebar.header("Visualization Settings")
 
     chart_window = st.sidebar.slider(
@@ -265,33 +442,8 @@ def show():
     )
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Time Navigation")
 
-    max_idx = len(messages) - 1
-
-    current_idx = st.sidebar.slider(
-        "Event Index",
-        min_value=0,
-        max_value=max_idx,
-        value=st.session_state.current_idx,
-        step=1,
-        key="l1_idx_slider",
-    )
-    st.session_state.current_idx = current_idx
-
-    jump_col1, jump_col2, jump_col3 = st.sidebar.columns(3)
-    with jump_col1:
-        if st.button("-1000", key="l1_jump_back_1000", use_container_width=True):
-            st.session_state.current_idx = max(0, current_idx - 1000)
-            st.rerun()
-    with jump_col2:
-        if st.button("Reset", key="l1_jump_reset", use_container_width=True):
-            st.session_state.current_idx = 0
-            st.rerun()
-    with jump_col3:
-        if st.button("+1000", key="l1_jump_fwd_1000", use_container_width=True):
-            st.session_state.current_idx = min(max_idx, current_idx + 1000)
-            st.rerun()
+    current_idx = st.session_state.current_idx
 
     current_ob = orderbook.iloc[current_idx]
 
