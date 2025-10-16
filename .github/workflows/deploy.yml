@@ -48,8 +48,22 @@ jobs:
 
           # Use HuggingFace Space README
           cp README_HF.md README.md
+
+          # Remove PNG (and other tracked binary) assets from the deployment
+          mapfile -d '' png_files < <(git ls-files -z '*.png') || true
+          if [ "${#png_files[@]}" -gt 0 ]; then
+            echo "Excluding PNG assets from Hugging Face deployment:"
+            for file in "${png_files[@]}"; do
+              echo "  - $file"
+            done
+            git rm --cached "${png_files[@]}"
+          else
+            echo "No PNG assets to exclude from Hugging Face deployment."
+          fi
+
+          # Commit deployment-specific changes (README swap and filtered assets)
           git add README.md
-          git commit -m "Configure HuggingFace Space" || true
+          git commit -m "Prepare Hugging Face deployment artifacts" || true
 
           # Push to HF Spaces (using generic username for HF git auth)
           git remote add hf https://hf:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME

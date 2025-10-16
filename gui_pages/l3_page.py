@@ -1,9 +1,10 @@
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.colors as pc
-from typing import Dict, List, Tuple
 from collections import defaultdict
+from typing import Dict, List, Tuple
+
+import pandas as pd
+import plotly.colors as pc
+import plotly.graph_objects as go
+import streamlit as st
 from .data import (
     init_session_state,
     load_ticker_data,
@@ -50,21 +51,77 @@ def update_order_book(order_book: Dict, msg: pd.Series) -> Dict:
                 del order_book[side][order_id]
 
     return order_book
+class OrderBookReplayCache:
+    def __init__(self) -> None:
+        self.cache_key: str | None = None
+        self.max_lookback: int = 50000
+        self._order_book: Dict = {"bids": {}, "asks": {}}
+        self._last_idx: int = -1
+
+    def reset(self) -> None:
+        self._order_book = {"bids": {}, "asks": {}}
+        self._last_idx = -1
+
+    def _clone_state(self) -> Dict:
+        return {
+            "bids": {k: v.copy() for k, v in self._order_book["bids"].items()},
+            "asks": {k: v.copy() for k, v in self._order_book["asks"].items()},
+        }
+
+    def get_state(
+        self,
+        cache_key: str | None,
+        messages: pd.DataFrame,
+        up_to_idx: int,
+        max_lookback: int,
+    ) -> Dict:
+        if cache_key != self.cache_key or max_lookback != self.max_lookback:
+            self.cache_key = cache_key
+            self.max_lookback = max_lookback
+            self.reset()
+
+        if up_to_idx < 0:
+            return {"bids": {}, "asks": {}}
+
+        target_start = max(0, up_to_idx - self.max_lookback)
+
+        needs_rebuild = (
+            self._last_idx < target_start
+            or up_to_idx < self._last_idx
+            or self._last_idx == -1
+        )
+
+        if needs_rebuild:
+            self._order_book = {"bids": {}, "asks": {}}
+            replay_start = target_start
+        else:
+            replay_start = self._last_idx + 1
+
+        replay_end = min(up_to_idx, len(messages) - 1)
+
+        if replay_start <= replay_end:
+            for idx in range(replay_start, replay_end + 1):
+                msg = messages.iloc[idx]
+                update_order_book(self._order_book, msg)
+
+        self._last_idx = max(self._last_idx, replay_end)
+        return self._clone_state()
 
 
-@st.cache_data(show_spinner=False)
+def _get_replay_cache() -> OrderBookReplayCache:
+    cache = st.session_state.get("order_book_cache")
+    if not isinstance(cache, OrderBookReplayCache):
+        cache = OrderBookReplayCache()
+        st.session_state.order_book_cache = cache
+    return cache
+
+
 def reconstruct_order_book_state(
     messages: pd.DataFrame, up_to_idx: int, max_lookback: int = 50000
 ) -> Dict:
-    order_book = {"bids": {}, "asks": {}}
-
-    start_idx = max(0, up_to_idx - max_lookback)
-
-    for i in range(start_idx, min(up_to_idx + 1, len(messages))):
-        msg = messages.iloc[i]
-        order_book = update_order_book(order_book, msg)
-
-    return order_book
+    cache = _get_replay_cache()
+    data_cache_key = st.session_state.get("data_cache_key")
+    return cache.get_state(data_cache_key, messages, up_to_idx, max_lookback)
 
 
 def _sample_queue_color(
@@ -106,7 +163,7 @@ def format_order_queue_table(
                     "Price": f"${price:.2f}",
                     "Queue Pos": f"{i + 1}/{len(orders_sorted)}",
                     "Order ID": order["id"],
-                    "Size": f'{order['size']:,}',
+                    "Size": f"{order['size']:,}",
                     "Time": seconds_to_eastern_time(order["time"], date_str),
                 }
             )

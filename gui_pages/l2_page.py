@@ -1,10 +1,14 @@
-import streamlit as st
+from collections import OrderedDict
+from typing import Optional, Tuple
+
 import pandas as pd
 import plotly.graph_objects as go
-from typing import Optional, Tuple
+import streamlit as st
+
 from .data import (
     init_session_state,
     load_ticker_data,
+    get_polars_frames,
 )
 from .utils import (
     seconds_to_eastern_time,
@@ -17,31 +21,73 @@ from .ui import (
 )
 
 
-@st.cache_data
-def get_orderbook_depth(
-    ob_row: pd.Series, levels: int = 10
+def _get_cache(name: str, max_entries: int = 64) -> OrderedDict:
+    cache = st.session_state.setdefault(name, OrderedDict())
+    while len(cache) > max_entries:
+        cache.popitem(last=False)
+    return cache
+
+
+def _get_orderbook_depth_polars(
+    orderbook_pl, idx: int, levels: int
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    if orderbook_pl is None or idx < 0 or idx >= orderbook_pl.height:
+        return pd.DataFrame(), pd.DataFrame()
+
+    row = orderbook_pl.slice(idx, 1).to_dicts()[0]
     bids = []
     asks = []
 
     for i in range(1, levels + 1):
-        ask_px_col = f"ask_price_{i}"
-        ask_sz_col = f"ask_size_{i}"
-        bid_px_col = f"bid_price_{i}"
-        bid_sz_col = f"bid_size_{i}"
+        ask_px = row.get(f"ask_price_{i}")
+        ask_sz = row.get(f"ask_size_{i}")
+        bid_px = row.get(f"bid_price_{i}")
+        bid_sz = row.get(f"bid_size_{i}")
 
-        if ask_px_col in ob_row and bid_px_col in ob_row:
-            ask_px = ob_row[ask_px_col]
-            ask_sz = ob_row[ask_sz_col]
-            bid_px = ob_row[bid_px_col]
-            bid_sz = ob_row[bid_sz_col]
-
-            if ask_px < 9999999999 and ask_sz > 0:
-                asks.append({"price": ask_px / 10000.0, "size": ask_sz})
-            if bid_px > -9999999999 and bid_sz > 0:
-                bids.append({"price": bid_px / 10000.0, "size": bid_sz})
+        if ask_px is not None and ask_sz is not None and ask_px < 9_999_999_999 and ask_sz > 0:
+            asks.append({"price": ask_px / 10000.0, "size": ask_sz})
+        if bid_px is not None and bid_sz is not None and bid_px > -9_999_999_999 and bid_sz > 0:
+            bids.append({"price": bid_px / 10000.0, "size": bid_sz})
 
     return pd.DataFrame(bids), pd.DataFrame(asks)
+
+
+def get_orderbook_depth(
+    orderbook: pd.DataFrame, idx: int, levels: int = 10
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    data_cache_key = st.session_state.get("data_cache_key")
+    cache = _get_cache("depth_cache")
+    cache_key = (data_cache_key, idx, levels)
+
+    if cache_key in cache:
+        cache.move_to_end(cache_key)
+        return cache[cache_key]
+
+    _, orderbook_pl = get_polars_frames()
+
+    if orderbook_pl is not None:
+        bids, asks = _get_orderbook_depth_polars(orderbook_pl, idx, levels)
+    else:
+        ob_row = orderbook.iloc[idx]
+        bids = []
+        asks = []
+
+        for i in range(1, levels + 1):
+            ask_px = ob_row.get(f"ask_price_{i}")
+            ask_sz = ob_row.get(f"ask_size_{i}")
+            bid_px = ob_row.get(f"bid_price_{i}")
+            bid_sz = ob_row.get(f"bid_size_{i}")
+
+            if ask_px is not None and ask_sz is not None and ask_px < 9_999_999_999 and ask_sz > 0:
+                asks.append({"price": ask_px / 10000.0, "size": ask_sz})
+            if bid_px is not None and bid_sz is not None and bid_px > -9_999_999_999 and bid_sz > 0:
+                bids.append({"price": bid_px / 10000.0, "size": bid_sz})
+
+        bids = pd.DataFrame(bids)
+        asks = pd.DataFrame(asks)
+
+    cache[cache_key] = (bids, asks)
+    return bids, asks
 
 
 @st.cache_data
@@ -208,7 +254,7 @@ def show():
     st.markdown("---")
 
     st.markdown("#### Order Book Depth")
-    bids, asks = get_orderbook_depth(current_ob, levels=display_levels)
+    bids, asks = get_orderbook_depth(orderbook, current_idx, levels=display_levels)
 
     if not bids.empty and not asks.empty:
         fig_ob = plot_orderbook(bids, asks, current_msg)
