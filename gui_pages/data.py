@@ -311,7 +311,7 @@ def load_ticker_data():
             return None, None, available_tickers
 
         if st.session_state.data_loaded:
-            st.experimental_rerun()
+            st.rerun()
         return None, None, available_tickers
 
     messages = st.session_state.messages
