@@ -70,8 +70,6 @@ section[data-testid="stHorizontalBlock"] > div {
 
 
 def apply_global_styles() -> None:
-    """Inject a single CSS block that keeps typography readable and responsive."""
-
     st.markdown(_GLOBAL_STYLE, unsafe_allow_html=True)
 
 
@@ -86,25 +84,14 @@ LOBSTER_DATASETS = {
 
 
 def seconds_to_eastern_time(seconds: float, date_str: str = "2012-06-21") -> str:
-    """
-    Convert LOBSTER timestamp (seconds after midnight) to Eastern time string.
-
-    Args:
-        seconds: Seconds after midnight (decimal)
-        date_str: Date string in YYYY-MM-DD format
-
-    Returns:
-        Formatted time string in Eastern timezone (HH:MM:SS.mmm)
-    """
     eastern = zoneinfo.ZoneInfo("America/New_York")
     base_date = datetime.strptime(date_str, "%Y-%m-%d")
     timestamp = base_date + timedelta(seconds=seconds)
     timestamp_eastern = timestamp.replace(tzinfo=eastern)
-    return timestamp_eastern.strftime("%H:%M:%S.%f")[:-3]  # Truncate to milliseconds
+    return timestamp_eastern.strftime("%H:%M:%S.%f")[:-3]
 
 
 def get_dataset_date(ticker_name: str) -> str:
-    """Extract date from ticker name or use default."""
     for ticker, info in LOBSTER_DATASETS.items():
         if ticker in ticker_name:
             return info["date"]
@@ -116,7 +103,6 @@ def render_metrics_grid(
     *,
     columns: int = 3,
 ) -> None:
-    """Render a set of metric widgets using a responsive grid layout."""
 
     items = list(metrics)
     if not items:
@@ -225,8 +211,6 @@ def get_available_tickers(sample_files: dict) -> dict:
 
 def init_session_state():
     if "selected_ticker" not in st.session_state:
-        # Don't call get_available_tickers during init to avoid triggering downloads
-        # Use MSFT (30 levels) as default - smaller than SPY for faster initial load
         st.session_state.selected_ticker = "MSFT (30 levels)"
     if "current_idx" not in st.session_state:
         st.session_state.current_idx = 0
@@ -249,7 +233,6 @@ def load_ticker_data():
     data_source = "Hugging Face" if USE_HUGGINGFACE else "Local Files"
     st.sidebar.info(f"Data source: {data_source}")
 
-    # Validate that selected ticker exists, otherwise pick first available
     if st.session_state.selected_ticker not in available_tickers:
         st.session_state.selected_ticker = list(available_tickers.keys())[0]
 
@@ -260,7 +243,6 @@ def load_ticker_data():
         key="ticker_selector",
     )
 
-    # If ticker changed, reset state
     if selected_ticker != st.session_state.selected_ticker:
         st.session_state.selected_ticker = selected_ticker
         st.session_state.current_idx = 0
@@ -270,10 +252,9 @@ def load_ticker_data():
 
     msg_path, ob_path = available_tickers[selected_ticker]
 
-    # Add explicit load button if data not loaded
     if not st.session_state.data_loaded:
         st.sidebar.markdown("---")
-        if st.sidebar.button("📥 Load Data", type="primary", use_container_width=True):
+        if st.sidebar.button("Load Data", type="primary", use_container_width=True):
             try:
                 with st.spinner(f"Loading LOBSTER data from {data_source}..."):
                     if USE_HUGGINGFACE:
@@ -294,14 +275,13 @@ def load_ticker_data():
                 st.error(f"Orderbook path: {ob_path}")
                 return None, None, available_tickers
 
-        st.info("👆 Click 'Load Data' to begin")
+        st.info("Click 'Load Data' to begin")
         return None, None, available_tickers
 
-    # Data is loaded, return it
     messages = st.session_state.messages
     orderbook = st.session_state.orderbook
 
     if messages is not None and orderbook is not None:
-        st.sidebar.success(f"✓ Loaded {len(messages):,} events")
+        st.sidebar.success(f"Loaded {len(messages):,} events")
 
     return messages, orderbook, available_tickers

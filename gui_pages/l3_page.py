@@ -152,7 +152,7 @@ def plot_order_book_depth_with_queue(
                     marker=dict(color="rgba(0, 180, 0, 0.7)"),
                     hovertemplate="%{customdata}<extra></extra>",
                     customdata=["<br>".join(hover_lines)],
-                    showlegend=(price == bid_levels[0][0]),  # Only show legend once
+                    showlegend=bool(price == bid_levels[0][0]),  # Only show legend once
                     legendgroup="bids",
                 )
             )
@@ -205,7 +205,7 @@ def plot_order_book_depth_with_queue(
                     marker=dict(color="rgba(255, 50, 50, 0.7)"),
                     hovertemplate="%{customdata}<extra></extra>",
                     customdata=["<br>".join(hover_lines)],
-                    showlegend=(price == ask_levels[0][0]),  # Only show legend once
+                    showlegend=bool(price == ask_levels[0][0]),  # Only show legend once
                     legendgroup="asks",
                 )
             )
