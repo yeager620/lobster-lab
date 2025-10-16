@@ -42,25 +42,9 @@ jobs:
 
           echo "🚀 Deploying to HF Space: $HF_SPACE_NAME"
 
-          pip install git-filter-repo
-
+          # Clone repository
           git clone . hf-deploy --branch main
-
           cd hf-deploy
-
-          # Remove all LOBSTER sample files to prevent pushing large CSV files to HF Spaces
-          # Must use git rm since filter-repo doesn't work well in loops
-          if ls LOBSTER_SampleFile_* >/dev/null 2>&1; then
-            echo "📦 Removing large LOBSTER sample files from git history..."
-
-            # Remove directories from working tree and staging
-            git rm -rf LOBSTER_SampleFile_* || true
-
-            # Remove from entire git history (all branches)
-            git filter-repo --path-glob 'LOBSTER_SampleFile_*' --invert-paths --force
-
-            echo "✓ Sample files removed from git history"
-          fi
 
           # Use HuggingFace Space README
           cp README_HF.md README.md

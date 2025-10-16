@@ -62,7 +62,7 @@ def _sample_queue_color(
     if queue_length <= 1:
         position = 0.0
     else:
-        denominator = max(queue_length - 1, 1)
+        denominator = max(queumaybe e_length - 1, 1)
         position = min(max(queue_idx / denominator, 0.0), 1.0)
 
     try:
