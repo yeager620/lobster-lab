@@ -2,6 +2,8 @@ import time
 import streamlit as st
 from typing import Tuple, Any, Iterable
 
+from .data import prefetch_data_around_index
+
 
 def apply_global_styles() -> None:
     global_style = """
@@ -241,3 +243,15 @@ def render_sidebar(*, playback_enabled: bool = True) -> None:
         st.session_state.last_search_result = None
         st.session_state.is_playing = False
         st.rerun()
+
+    step_for_prefetch = max(int(step_size), 1)
+    lookahead = max(step_for_prefetch * 8, 256)
+    chunk_size = max(step_for_prefetch * 2, 64)
+    backfill = step_for_prefetch * 2
+
+    prefetch_data_around_index(
+        st.session_state.current_idx,
+        lookahead=lookahead,
+        chunk_size=chunk_size,
+        backfill=backfill,
+    )

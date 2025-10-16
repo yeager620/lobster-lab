@@ -8,6 +8,8 @@ import streamlit as st
 from .data import (
     init_session_state,
     load_ticker_data,
+    get_message_batch,
+    get_event_row,
 )
 from .utils import (
     seconds_to_eastern_time,
@@ -52,6 +54,8 @@ def update_order_book(order_book: Dict, msg: pd.Series) -> Dict:
                 del order_book[side][order_id]
 
     return order_book
+
+
 class OrderBookReplayCache:
     def __init__(self) -> None:
         self.cache_key: str | None = None
@@ -72,7 +76,7 @@ class OrderBookReplayCache:
     def get_state(
         self,
         cache_key: str | None,
-        messages: pd.DataFrame,
+        messages: pd.DataFrame | None,
         up_to_idx: int,
         max_lookback: int,
     ) -> Dict:
@@ -101,8 +105,12 @@ class OrderBookReplayCache:
         replay_end = min(up_to_idx, len(messages) - 1)
 
         if replay_start <= replay_end:
-            for idx in range(replay_start, replay_end + 1):
-                msg = messages.iloc[idx]
+            batch = get_message_batch(replay_start, replay_end + 1)
+
+            if batch.empty and messages is not None:
+                batch = messages.iloc[replay_start : replay_end + 1]
+
+            for _, msg in batch.iterrows():
                 update_order_book(self._order_book, msg)
 
         self._last_idx = max(self._last_idx, replay_end)
@@ -118,7 +126,7 @@ def _get_replay_cache() -> OrderBookReplayCache:
 
 
 def reconstruct_order_book_state(
-    messages: pd.DataFrame, up_to_idx: int, max_lookback: int = 50000
+    messages: pd.DataFrame | None, up_to_idx: int, max_lookback: int = 50000
 ) -> Dict:
     cache = _get_replay_cache()
     data_cache_key = st.session_state.get("data_cache_key")
@@ -479,7 +487,7 @@ def render_l3_sidebar() -> int:
     return display_levels
 
 
-def _ensure_order_book_state(messages: pd.DataFrame, target_idx: int) -> Dict:
+def _ensure_order_book_state(messages: pd.DataFrame | None, target_idx: int) -> Dict:
     if "order_book_last_idx" not in st.session_state:
         st.session_state.order_book_last_idx = None
 
@@ -499,8 +507,14 @@ def _ensure_order_book_state(messages: pd.DataFrame, target_idx: int) -> Dict:
         return order_book
 
     if target_idx > last_idx:
-        for idx in range(last_idx + 1, target_idx + 1):
-            msg = messages.iloc[idx]
+        batch_start = last_idx + 1
+        batch_end = target_idx + 1
+        batch = get_message_batch(batch_start, batch_end)
+
+        if batch.empty and messages is not None:
+            batch = messages.iloc[batch_start:batch_end]
+
+        for _, msg in batch.iterrows():
             order_book = update_order_book(order_book, msg)
         st.session_state.order_book = order_book
         st.session_state.order_book_last_idx = target_idx
@@ -509,7 +523,19 @@ def _ensure_order_book_state(messages: pd.DataFrame, target_idx: int) -> Dict:
 
 
 def render_main_content(state, display_levels):
-    current_msg = st.session_state.messages.iloc[st.session_state.current_idx]
+    current_msg, _ = get_event_row(st.session_state.current_idx)
+
+    if current_msg is None:
+        st.warning("Unable to resolve event data for the selected index.")
+        return
+
+    messages_df = st.session_state.get("messages")
+
+    total_events = len(messages_df) if messages_df is not None else 0
+    if total_events == 0:
+        messages_pl = st.session_state.get("messages_polars")
+        if messages_pl is not None:
+            total_events = messages_pl.height
 
     message_types = {
         1: ("New Limit Order", "blue"),
@@ -523,12 +549,14 @@ def render_main_content(state, display_levels):
         int(current_msg["type"]), ("Unknown", "gray")
     )
 
-    st.markdown(f"### Event #{st.session_state.current_idx:,} / {len(st.session_state.messages):,}")
+    st.markdown(
+        f"### Event #{st.session_state.current_idx:,} / {max(total_events, 1):,}"
+    )
     st.markdown(f"**Event Type:** :{msg_type_color}[{msg_type_text}]")
 
     with st.spinner("Reconstructing order book state..."):
         order_book = _ensure_order_book_state(
-            st.session_state.messages, st.session_state.current_idx
+            messages_df, st.session_state.current_idx
         )
 
     st.markdown("---")

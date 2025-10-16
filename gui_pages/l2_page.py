@@ -9,6 +9,7 @@ from .data import (
     init_session_state,
     load_ticker_data,
     get_polars_frames,
+    get_event_row,
 )
 from .utils import (
     seconds_to_eastern_time,
@@ -209,8 +210,11 @@ def show():
         display_levels = 1
 
     current_idx = st.session_state.current_idx
-    current_msg = messages.iloc[current_idx]
-    current_ob = orderbook.iloc[current_idx]
+    current_msg, current_ob = get_event_row(current_idx)
+
+    if current_msg is None or current_ob is None:
+        st.warning("Unable to resolve event data for the selected index.")
+        return
 
     message_types = {
         1: ("New Limit Order", "blue"),
@@ -224,7 +228,13 @@ def show():
         int(current_msg["type"]), ("Unknown", "gray")
     )
 
-    st.markdown(f"### Event #{current_idx:,} / {len(messages):,}")
+    total_events = len(messages) if messages is not None else 0
+    if total_events == 0:
+        messages_pl, _ = get_polars_frames()
+        if messages_pl is not None:
+            total_events = messages_pl.height
+
+    st.markdown(f"### Event #{current_idx:,} / {total_events:,}")
     st.markdown(f"**Event Type:** :{msg_type_color}[{msg_type_text}]")
 
     st.markdown("#### Current Message Details")
