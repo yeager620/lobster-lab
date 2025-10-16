@@ -78,6 +78,207 @@ def _ensure_cache_dict(name: str) -> OrderedDict:
         cache.popitem(last=False)
     return cache
 
+
+def _ensure_prefetch_cache() -> OrderedDict:
+    cache = st.session_state.setdefault("_prefetch_window_cache", OrderedDict())
+    while len(cache) > 16:
+        cache.popitem(last=False)
+    return cache
+
+
+def reset_prefetch_cache() -> None:
+    st.session_state["_prefetch_window_cache"] = OrderedDict()
+
+
+def _prefetch_chunk(
+    cache_key: str,
+    messages_pl: pl.DataFrame,
+    orderbook_pl: pl.DataFrame,
+    start_idx: int,
+    end_idx: int,
+) -> None:
+    cache = _ensure_prefetch_cache()
+    key = (cache_key, start_idx, end_idx)
+
+    if key in cache:
+        cache.move_to_end(key)
+        return
+
+    msg_window = polars_window_to_pandas(messages_pl, start_idx, end_idx)
+    ob_window = polars_window_to_pandas(orderbook_pl, start_idx, end_idx)
+
+    cache[key] = (msg_window, ob_window)
+
+
+def _iter_prefetch_matches(cache_key: str, idx: int):
+    cache = st.session_state.get("_prefetch_window_cache")
+    if not isinstance(cache, OrderedDict):
+        return
+
+    for key in reversed(cache):
+        cached_key, start, end = key
+        if cached_key != cache_key:
+            continue
+        if start <= idx < end:
+            yield key, cache[key]
+
+
+def _get_cached_window(
+    cache_key: str, start_idx: int, end_idx: int
+) -> tuple[pd.DataFrame, pd.DataFrame, int] | None:
+    cache = st.session_state.get("_prefetch_window_cache")
+    if not isinstance(cache, OrderedDict):
+        return None
+
+    for key in reversed(cache):
+        cached_key, start, end = key
+        if cached_key != cache_key:
+            continue
+        if start <= start_idx and end_idx <= end:
+            msg_df, ob_df = cache[key]
+            return msg_df, ob_df, start
+
+    return None
+
+
+def get_prefetched_row(idx: int) -> tuple[pd.Series | None, pd.Series | None]:
+    data_cache_key = st.session_state.get("data_cache_key")
+    if data_cache_key is None:
+        return None, None
+
+    for key, (msg_df, ob_df) in _iter_prefetch_matches(data_cache_key, idx) or []:
+        offset = idx - key[1]
+        if 0 <= offset < len(msg_df) and 0 <= offset < len(ob_df):
+            return msg_df.iloc[offset], ob_df.iloc[offset]
+
+    return None, None
+
+
+def prefetch_data_range(start_idx: int, end_idx: int, *, chunk_size: int = 256) -> None:
+    messages_pl, orderbook_pl = get_polars_frames()
+    data_cache_key = st.session_state.get("data_cache_key")
+
+    if (
+        messages_pl is None
+        or orderbook_pl is None
+        or data_cache_key is None
+        or start_idx >= end_idx
+    ):
+        return
+
+    start_idx = max(start_idx, 0)
+    end_idx = min(end_idx, messages_pl.height)
+
+    if start_idx >= end_idx:
+        return
+
+    chunk_size = max(int(chunk_size), 1)
+
+    for chunk_start in range(start_idx, end_idx, chunk_size):
+        chunk_end = min(chunk_start + chunk_size, end_idx)
+        _prefetch_chunk(
+            data_cache_key,
+            messages_pl,
+            orderbook_pl,
+            chunk_start,
+            chunk_end,
+        )
+
+
+def prefetch_data_around_index(
+    idx: int,
+    *,
+    lookahead: int | None = None,
+    chunk_size: int = 256,
+    backfill: int = 0,
+) -> None:
+    messages_pl, _ = get_polars_frames()
+
+    if messages_pl is None:
+        return
+
+    if lookahead is None:
+        lookahead = max(chunk_size * 2, 512)
+
+    start_idx = max(0, idx - max(int(backfill), 0))
+    end_idx = min(messages_pl.height, idx + 1 + max(int(lookahead), 1))
+
+    prefetch_data_range(start_idx, end_idx, chunk_size=chunk_size)
+
+
+def get_event_row(idx: int) -> tuple[pd.Series | None, pd.Series | None]:
+    if idx < 0:
+        return None, None
+
+    messages = st.session_state.get("messages")
+    orderbook = st.session_state.get("orderbook")
+
+    if messages is not None and orderbook is not None:
+        if idx >= len(messages):
+            return None, None
+        return messages.iloc[idx], orderbook.iloc[idx]
+
+    prefetched = get_prefetched_row(idx)
+    if prefetched[0] is not None and prefetched[1] is not None:
+        return prefetched
+
+    messages_pl, orderbook_pl = get_polars_frames()
+    data_cache_key = st.session_state.get("data_cache_key")
+
+    if (
+        messages_pl is None
+        or orderbook_pl is None
+        or data_cache_key is None
+        or idx >= messages_pl.height
+    ):
+        return None, None
+
+    prefetch_data_range(idx, idx + 1, chunk_size=1)
+
+    prefetched = get_prefetched_row(idx)
+    if prefetched[0] is not None and prefetched[1] is not None:
+        return prefetched
+
+    msg_window = polars_window_to_pandas(messages_pl, idx, idx + 1)
+    ob_window = polars_window_to_pandas(orderbook_pl, idx, idx + 1)
+
+    if msg_window.empty or ob_window.empty:
+        return None, None
+
+    return msg_window.iloc[0], ob_window.iloc[0]
+
+
+def get_message_batch(start_idx: int, end_idx: int) -> pd.DataFrame:
+    messages = st.session_state.get("messages")
+
+    if messages is not None:
+        return messages.iloc[start_idx:end_idx]
+
+    data_cache_key = st.session_state.get("data_cache_key")
+    messages_pl, _ = get_polars_frames()
+
+    if (
+        data_cache_key is None
+        or messages_pl is None
+        or start_idx >= end_idx
+        or start_idx >= messages_pl.height
+    ):
+        return pd.DataFrame()
+
+    start_idx = max(start_idx, 0)
+    end_idx = min(end_idx, messages_pl.height)
+
+    prefetch_data_range(start_idx, end_idx)
+
+    cached = _get_cached_window(data_cache_key, start_idx, end_idx)
+    if cached is not None:
+        msg_df, _ob_df, window_start = cached
+        rel_start = start_idx - window_start
+        rel_end = rel_start + (end_idx - start_idx)
+        return msg_df.iloc[rel_start:rel_end]
+
+    return polars_window_to_pandas(messages_pl, start_idx, end_idx)
+
 def discover_local_datasets() -> dict:
     datasets = {}
     cwd = Path.cwd()
@@ -254,6 +455,8 @@ def init_session_state():
         st.session_state.order_book_cache = None
     if "step_size_selector" not in st.session_state:
         st.session_state.step_size_selector = 1
+    if "_prefetch_window_cache" not in st.session_state:
+        st.session_state._prefetch_window_cache = OrderedDict()
 
 def load_ticker_data():
     available_tickers = get_available_tickers(ALL_SAMPLE_FILES)
@@ -285,6 +488,7 @@ def load_ticker_data():
         st.session_state.is_playing = False
         st.session_state.step_size_selector = 1
         st.session_state.last_search_result = None
+        reset_prefetch_cache()
 
     st.sidebar.selectbox(
         "Select Ticker",
@@ -314,6 +518,8 @@ def load_ticker_data():
                 st.session_state.current_idx = 0
                 st.session_state.is_playing = False
                 st.session_state.last_search_result = None
+                reset_prefetch_cache()
+                prefetch_data_around_index(0)
         except Exception as e:
             st.error(f"Error loading data: {e}")
             if USE_HUGGINGFACE:
