@@ -1,13 +1,18 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from .shared import (
+from .data import (
     init_session_state,
     load_ticker_data,
+)
+from .utils import (
     seconds_to_eastern_time,
     get_dataset_date,
+)
+from .ui import (
     apply_global_styles,
     render_metrics_grid,
+    render_sidebar,
 )
 
 
@@ -47,26 +52,6 @@ def create_candlestick_data(
             )
 
     return pd.DataFrame(candles)
-
-
-@st.cache_data
-def compute_mid_prices(orderbook: pd.DataFrame, start_idx: int, end_idx: int) -> tuple:
-    """Pre-compute mid prices for a window to avoid repeated calculations."""
-    mid_prices = []
-
-    ob_window = orderbook.iloc[start_idx:end_idx]
-    for i in range(len(ob_window)):
-        ob = ob_window.iloc[i]
-        ask_px = ob["ask_price_1"]
-        bid_px = ob["bid_price_1"]
-        if bid_px > 0 and ask_px < 9999999999:
-            mid = (bid_px + ask_px) / 20000.0
-            mid_prices.append(mid)
-        else:
-            mid_prices.append(None)
-
-    return mid_prices
-
 
 def plot_price_candlestick(
     messages: pd.DataFrame,
