@@ -42,7 +42,6 @@ jobs:
 
           echo "Deploying to HF Space: $HF_SPACE_NAME"
 
-          # Stage a clean deployment worktree without Git history
           rm -rf hf-deploy
           mkdir hf-deploy
           rsync -a --delete \
@@ -52,10 +51,8 @@ jobs:
 
           cd hf-deploy
 
-          # Use HuggingFace Space README
           cp README_HF.md README.md
 
-          # Drop PNG assets (and other obvious binary blobs) from the deployment tree
           deleted_assets=false
           while IFS= read -r -d '' asset; do
             if [ "$deleted_assets" = false ]; then
@@ -71,16 +68,14 @@ jobs:
             echo "No binary assets to exclude from Hugging Face deployment."
           fi
 
-          # Initialise a fresh repository for the deployment payload
           git init
           git checkout -b main
           git add .
           git commit -m "Prepare Hugging Face deployment artifacts"
 
-          # Push to HF Spaces (using generic username for HF git auth)
           git remote add hf https://hf:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME
 
-          echo "📤 Pushing to HuggingFace Spaces..."
+          echo "Pushing to HuggingFace Spaces..."
           git push hf main:main --force
 
           cd ..
