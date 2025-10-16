@@ -2,6 +2,10 @@
 
 Interactive visualization and backtesting toolkit for LOBSTER limit order book data with L1, L2, and L3 market microstructure views.
 
+[**Launch Streamlit App**](https://lobster-lab.streamlit.app/)
+
+[**Hugging Face Spaces**](https://huggingface.co/spaces/totalorganfailure/lobster-lab)
+
 ## Features
 
 - **L1 View**: Price action with candlesticks, volume profiles, and execution analysis
@@ -63,5 +67,6 @@ uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data
 
 ### Orderbook File (Nx4L)
 For each level i: `[ask_price_i, ask_size_i, bid_price_i, bid_size_i]`
+
 
 Unoccupied levels: `ask_price=9999999999, bid_price=-9999999999, size=0`
