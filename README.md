@@ -2,13 +2,12 @@
 
 Interactive visualization and backtesting toolkit for LOBSTER limit order book data with L1, L2, and L3 market microstructure views.
 
+<img src="https://github.com/yeager620/lobster-lab/blob/main/streamlit_02.png" alt="Book Head">
+<img src="https://github.com/yeager620/lobster-lab/blob/main/streamlit_01.png" alt="Book Chart">
+
 [**Launch Streamlit App**](https://lobster-lab.streamlit.app/)
 
 [**Hugging Face Spaces**](https://huggingface.co/spaces/totalorganfailure/lobster-lab)
-
-<img src="https://github.com/yeager620/lobster-lab/blob/main/streamlit_02" alt="book_head">
-
-<img src="https://github.com/yeager620/lobster-lab/blob/main/streamlit_01" alt="book_chart">
 
 
 ## Features
@@ -75,6 +74,7 @@ For each level i: `[ask_price_i, ask_size_i, bid_price_i, bid_size_i]`
 
 
 Unoccupied levels: `ask_price=9999999999, bid_price=-9999999999, size=0`
+
 
 
 
