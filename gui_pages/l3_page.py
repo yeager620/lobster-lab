@@ -581,7 +581,7 @@ def render_main_content(state, display_levels):
     fig_depth, bid_levels, ask_levels = plot_order_book_depth_with_queue(
         order_book, levels=display_levels
     )
-    st.plotly_chart(fig_depth, use_container_width=True, key=f"l3_depth_{st.session_state.current_idx}")
+    st.plotly_chart(fig_depth, width="stretch", key=f"l3_depth_{st.session_state.current_idx}")
 
     st.markdown("#### Order Queue Details")
     date_str = get_dataset_date(st.session_state.selected_ticker)
@@ -591,7 +591,7 @@ def render_main_content(state, display_levels):
         st.markdown("**Bid Queue (FIFO Order)**")
         bid_table = format_order_queue_table(bid_levels, "bid", date_str)
         if not bid_table.empty:
-            st.dataframe(bid_table, use_container_width=True, hide_index=True)
+            st.dataframe(bid_table, width="stretch", hide_index=True)
         else:
             st.write("No bid orders")
 
@@ -599,7 +599,7 @@ def render_main_content(state, display_levels):
         st.markdown("**Ask Queue (FIFO Order)**")
         ask_table = format_order_queue_table(ask_levels, "ask", date_str)
         if not ask_table.empty:
-            st.dataframe(ask_table, use_container_width=True, hide_index=True)
+            st.dataframe(ask_table, width="stretch", hide_index=True)
         else:
             st.write("No ask orders")
 
@@ -610,12 +610,12 @@ def render_main_content(state, display_levels):
     with col1:
         st.markdown("### Order Size Distribution")
         fig_sizes = plot_order_size_distribution(order_book)
-        st.plotly_chart(fig_sizes, use_container_width=True, config={})
+        st.plotly_chart(fig_sizes, width="stretch", config={})
 
     with col2:
         st.markdown("### Order Arrival Rate")
         fig_flow = plot_order_flow_rate(st.session_state.messages, window=100, date_str=date_str)
-        st.plotly_chart(fig_flow, use_container_width=True, config={})
+        st.plotly_chart(fig_flow, width="stretch", config={})
 
     st.markdown("---")
 
@@ -626,7 +626,7 @@ def render_main_content(state, display_levels):
 
     if order_id_input > 0:
         fig_timeline = plot_order_timeline(st.session_state.messages, order_id_input, date_str)
-        st.plotly_chart(fig_timeline, use_container_width=True, config={})
+        st.plotly_chart(fig_timeline, width="stretch", config={})
 
     with st.expander("View Complete Order Book (L3)"):
         col1, col2 = st.columns(2)
@@ -635,7 +635,7 @@ def render_main_content(state, display_levels):
             if order_book["bids"]:
                 bid_df = pd.DataFrame.from_dict(order_book["bids"], orient="index")
                 bid_df = bid_df.sort_values("price", ascending=False)
-                st.dataframe(bid_df, use_container_width=True)
+                st.dataframe(bid_df, width="stretch")
             else:
                 st.write("No bid orders")
 
@@ -644,7 +644,7 @@ def render_main_content(state, display_levels):
             if order_book["asks"]:
                 ask_df = pd.DataFrame.from_dict(order_book["asks"], orient="index")
                 ask_df = ask_df.sort_values("price")
-                st.dataframe(ask_df, use_container_width=True)
+                st.dataframe(ask_df, width="stretch")
             else:
                 st.write("No ask orders")
 
