@@ -19,39 +19,34 @@ from .ui import (
 @st.cache_data
 def create_candlestick_data(
     messages: pd.DataFrame, orderbook: pd.DataFrame, window: int = 100
-):
-    candles = []
+) -> pd.DataFrame:
 
-    mid_prices = []
-    times = []
+    if messages.empty or orderbook.empty:
+        return pd.DataFrame(columns=["time", "open", "high", "low", "close"])
 
-    for i in range(len(orderbook)):
-        ob = orderbook.iloc[i]
-        msg = messages.iloc[i]
-        ask_px = ob["ask_price_1"]
-        bid_px = ob["bid_price_1"]
+    df = orderbook[["bid_price_1", "ask_price_1"]].copy()
+    df["time"] = messages["time"].to_numpy()
 
-        if bid_px > 0 and ask_px < 9999999999:
-            mid = (bid_px + ask_px) / 20000.0
-            mid_prices.append(mid)
-            times.append(msg["time"])
+    valid = (df["bid_price_1"] > 0) & (df["ask_price_1"] < 9_999_999_999)
+    df = df.loc[valid].copy()
 
-    for i in range(0, len(mid_prices) - window, window):
-        window_prices = mid_prices[i : i + window]
-        window_times = times[i : i + window]
+    if df.empty:
+        return pd.DataFrame(columns=["time", "open", "high", "low", "close"])
 
-        if len(window_prices) > 0:
-            candles.append(
-                {
-                    "time": window_times[0],
-                    "open": window_prices[0],
-                    "high": max(window_prices),
-                    "low": min(window_prices),
-                    "close": window_prices[-1],
-                }
-            )
+    df["mid"] = (df["bid_price_1"] + df["ask_price_1"]) / 20_000.0
+    df.reset_index(drop=True, inplace=True)
+    df["bucket"] = df.index // max(window, 1)
 
-    return pd.DataFrame(candles)
+    grouped = df.groupby("bucket", sort=True)
+    candles = grouped.agg(
+        time=("time", "first"),
+        open=("mid", "first"),
+        high=("mid", "max"),
+        low=("mid", "min"),
+        close=("mid", "last"),
+    )
+
+    return candles.reset_index(drop=True)
 
 def plot_price_candlestick(
     messages: pd.DataFrame,
@@ -65,17 +60,6 @@ def plot_price_candlestick(
 
     msg_window = messages.iloc[start_idx:end_idx]
     ob_window = orderbook.iloc[start_idx:end_idx]
-
-    mid_prices = []
-    times = []
-    for i in range(len(ob_window)):
-        ob = ob_window.iloc[i]
-        ask_px = ob["ask_price_1"]
-        bid_px = ob["bid_price_1"]
-        if bid_px > 0 and ask_px < 9999999999:
-            mid = (bid_px + ask_px) / 20000.0
-            mid_prices.append(mid)
-            times.append(msg_window.iloc[i]["time"])
 
     candle_window = 50
     candle_data = create_candlestick_data(msg_window, ob_window, window=candle_window)
@@ -158,7 +142,6 @@ def plot_price_candlestick(
 def compute_volume_profile(
     messages: pd.DataFrame, start_idx: int, end_idx: int
 ) -> tuple:
-    """Pre-compute volume profile data."""
     msg_window = messages.iloc[start_idx:end_idx]
     exec_events = msg_window[msg_window["type"].isin([4, 5])].copy()
 
