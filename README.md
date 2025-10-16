@@ -21,58 +21,23 @@ uv sync
 ### Run GUI
 
 ```bash
-# Run with default HuggingFace dataset (totalorganfailure/lobster-lab-data)
+# use default HuggingFace dataset
 uv run streamlit run gui_app.py
 
-# Run with custom HuggingFace dataset
-export HF_REPO_ID="your-username/your-repo"
+# use custom HuggingFace dataset
+export HF_REPO_ID="USERNAME/REPO_NAME"
 uv run streamlit run gui_app.py
 
-# Run with local files (must be in ./LOBSTER_SampleFile_* directories)
+# use local files (must be in ./LOBSTER_SampleFile_*)
 export HF_REPO_ID=""
 uv run streamlit run gui_app.py
 ```
-
-### Run Backtesting
-
-```bash
-# Default: AAPL with 100 shares quote size
-uv run python main.py
-
-# Multiple tickers with custom parameters
-uv run python main.py --tickers AAPL MSFT SPY --quote-size 200 --participation 0.2
-```
-
-## Project Structure
-
-```
-lobster/
-├── gui_app.py              # Streamlit GUI entry point
-├── gui_pages/              # GUI page modules
-│   ├── l1_page.py         # Price action view
-│   ├── l2_page.py         # Order book depth view
-│   ├── l3_page.py         # Market-by-order view
-│   └── shared.py          # Shared utilities
-├── lobster_parsing.py      # Core LOBSTER data parser
-├── backtesting.py          # Market-making backtest engine
-├── main.py                 # Backtesting CLI entry point
-└── scripts/
-    └── sync_datasets.py    # HuggingFace sync utility
-```
-
-## Configuration
 
 ### Streamlit Secrets
 
 Create `.streamlit/secrets.toml`:
 ```toml
-HF_REPO_ID = "your-username/your-repo"
-```
-
-### Environment Variables
-
-```bash
-export HF_REPO_ID="your-username/lobster-data"  # HuggingFace dataset repo
+HF_REPO_ID = "USERNAME/REPO_NAME"
 ```
 
 ## Data Management
@@ -80,26 +45,8 @@ export HF_REPO_ID="your-username/lobster-data"  # HuggingFace dataset repo
 ### Sync Datasets to HuggingFace
 
 ```bash
-# Login to HuggingFace
 uv run huggingface-cli login
-
-# Sync all datasets
 uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data
-
-# Dry run to preview changes
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --dry-run
-
-# Sync specific tickers
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --tickers AAPL MSFT
-
-# Update README only
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --force-readme
-
-# Keep local files after upload
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --keep-local
-
-# Create private dataset
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --private
 ```
 
 ## Data Format
