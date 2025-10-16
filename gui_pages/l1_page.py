@@ -11,6 +11,7 @@ from .shared import (
 )
 
 
+@st.cache_data
 def create_candlestick_data(
     messages: pd.DataFrame, orderbook: pd.DataFrame, window: int = 100
 ):
@@ -46,6 +47,26 @@ def create_candlestick_data(
             )
 
     return pd.DataFrame(candles)
+
+
+@st.cache_data
+def compute_mid_prices(orderbook: pd.DataFrame, start_idx: int, end_idx: int) -> tuple:
+    """Pre-compute mid prices for a window to avoid repeated calculations."""
+    mid_prices = []
+    times = []
+
+    ob_window = orderbook.iloc[start_idx:end_idx]
+    for i in range(len(ob_window)):
+        ob = ob_window.iloc[i]
+        ask_px = ob["ask_price_1"]
+        bid_px = ob["bid_price_1"]
+        if bid_px > 0 and ask_px < 9999999999:
+            mid = (bid_px + ask_px) / 20000.0
+            mid_prices.append(mid)
+        else:
+            mid_prices.append(None)
+
+    return mid_prices
 
 
 def plot_price_candlestick(
@@ -149,6 +170,28 @@ def plot_price_candlestick(
     return fig
 
 
+@st.cache_data
+def compute_volume_profile(
+    messages: pd.DataFrame, start_idx: int, end_idx: int
+) -> tuple:
+    """Pre-compute volume profile data."""
+    msg_window = messages.iloc[start_idx:end_idx]
+    exec_events = msg_window[msg_window["type"].isin([4, 5])].copy()
+
+    if exec_events.empty:
+        return None, None, None
+
+    exec_events["price_level"] = (exec_events["price"] / 10000.0).round(2)
+
+    exec_events_buy = exec_events[exec_events["direction"] == 1]
+    exec_events_sell = exec_events[exec_events["direction"] == -1]
+
+    buy_profile = exec_events_buy.groupby("price_level")["size"].sum().reset_index()
+    sell_profile = exec_events_sell.groupby("price_level")["size"].sum().reset_index()
+
+    return exec_events, buy_profile, sell_profile
+
+
 def plot_volume_profile(
     messages: pd.DataFrame,
     orderbook: pd.DataFrame,
@@ -158,11 +201,11 @@ def plot_volume_profile(
     start_idx = max(0, current_idx - window_size)
     end_idx = min(len(messages), current_idx + 1)
 
-    msg_window = messages.iloc[start_idx:end_idx]
+    exec_events, buy_profile, sell_profile = compute_volume_profile(
+        messages, start_idx, end_idx
+    )
 
-    exec_events = msg_window[msg_window["type"].isin([4, 5])].copy()
-
-    if exec_events.empty:
+    if exec_events is None:
         fig = go.Figure()
         fig.add_annotation(
             text="No executions in current window",
@@ -173,18 +216,6 @@ def plot_volume_profile(
             showarrow=False,
         )
         return fig
-
-    exec_events["price_level"] = (exec_events["price"] / 10000.0).round(2)
-
-    volume_profile = exec_events.groupby("price_level")["size"].sum().reset_index()
-    volume_profile.columns = ["price", "volume"]
-    volume_profile = volume_profile.sort_values("price")
-
-    exec_events_buy = exec_events[exec_events["direction"] == 1]
-    exec_events_sell = exec_events[exec_events["direction"] == -1]
-
-    buy_profile = exec_events_buy.groupby("price_level")["size"].sum().reset_index()
-    sell_profile = exec_events_sell.groupby("price_level")["size"].sum().reset_index()
 
     fig = go.Figure()
 
@@ -325,7 +356,7 @@ def show():
         ticker_name=st.session_state.selected_ticker,
     )
     st.plotly_chart(
-        fig_candle, use_container_width=True, key=f"l1_candle_{current_idx}"
+        fig_candle, width="stretch", key=f"l1_candle_{current_idx}", config={}
     )
 
     st.markdown("---")
@@ -336,5 +367,5 @@ def show():
         messages, orderbook, current_idx, window_size=chart_window
     )
     st.plotly_chart(
-        fig_volume, use_container_width=True, key=f"l1_volume_{current_idx}"
+        fig_volume, width="stretch", key=f"l1_volume_{current_idx}", config={}
     )

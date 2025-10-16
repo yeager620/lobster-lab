@@ -14,6 +14,7 @@ from .shared import (
 )
 
 
+@st.cache_data(show_spinner=False)
 def reconstruct_order_book_state(
     messages: pd.DataFrame, up_to_idx: int, max_lookback: int = 50000
 ) -> Dict:
@@ -80,6 +81,27 @@ def _sample_queue_color(
         pass
 
     return fallback
+
+
+@st.cache_data
+def format_order_queue_table(
+    price_levels: List, side: str, date_str: str = "2012-06-21"
+) -> pd.DataFrame:
+    rows = []
+    for price, orders in price_levels:
+        orders_sorted = sorted(orders, key=lambda x: x["time"])
+        for i, order in enumerate(orders_sorted):
+            rows.append(
+                {
+                    "Price": f"${price:.2f}",
+                    "Queue Pos": f"{i + 1}/{len(orders_sorted)}",
+                    "Order ID": order["id"],
+                    "Size": f"{order['size']:,}",
+                    "Time": seconds_to_eastern_time(order["time"], date_str),
+                }
+            )
+
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
 def plot_order_book_depth_with_queue(
@@ -226,26 +248,6 @@ def plot_order_book_depth_with_queue(
     return fig, bid_levels, ask_levels
 
 
-def format_order_queue_table(
-    price_levels: List, side: str, date_str: str = "2012-06-21"
-) -> pd.DataFrame:
-    rows = []
-    for price, orders in price_levels:
-        orders_sorted = sorted(orders, key=lambda x: x["time"])
-        for i, order in enumerate(orders_sorted):
-            rows.append(
-                {
-                    "Price": f"${price:.2f}",
-                    "Queue Pos": f"{i + 1}/{len(orders_sorted)}",
-                    "Order ID": order["id"],
-                    "Size": f"{order['size']:,}",
-                    "Time": seconds_to_eastern_time(order["time"], date_str),
-                }
-            )
-
-    return pd.DataFrame(rows) if rows else pd.DataFrame()
-
-
 def plot_order_size_distribution(order_book: Dict) -> go.Figure:
     bid_sizes = [order["size"] for order in order_book["bids"].values()]
     ask_sizes = [order["size"] for order in order_book["asks"].values()]
@@ -275,6 +277,7 @@ def plot_order_size_distribution(order_book: Dict) -> go.Figure:
     return fig
 
 
+@st.cache_data
 def plot_order_timeline(
     messages: pd.DataFrame, order_id: int, date_str: str = "2012-06-21"
 ) -> go.Figure:
@@ -336,6 +339,7 @@ def plot_order_timeline(
     return fig
 
 
+@st.cache_data
 def plot_order_flow_rate(
     messages: pd.DataFrame, window: int = 100, date_str: str = "2012-06-21"
 ) -> go.Figure:
@@ -590,7 +594,7 @@ def show():
     fig_depth, bid_levels, ask_levels = plot_order_book_depth_with_queue(
         order_book, levels=display_levels
     )
-    st.plotly_chart(fig_depth, use_container_width=True, key=f"l3_depth_{current_idx}")
+    st.plotly_chart(fig_depth, width="stretch", key=f"l3_depth_{current_idx}")
 
     st.markdown("#### Order Queue Details")
     date_str = get_dataset_date(st.session_state.selected_ticker)
@@ -600,7 +604,7 @@ def show():
         st.markdown("**Bid Queue (FIFO Order)**")
         bid_table = format_order_queue_table(bid_levels, "bid", date_str)
         if not bid_table.empty:
-            st.dataframe(bid_table, use_container_width=True, hide_index=True)
+            st.dataframe(bid_table, width="stretch", hide_index=True)
         else:
             st.write("No bid orders")
 
@@ -608,7 +612,7 @@ def show():
         st.markdown("**Ask Queue (FIFO Order)**")
         ask_table = format_order_queue_table(ask_levels, "ask", date_str)
         if not ask_table.empty:
-            st.dataframe(ask_table, use_container_width=True, hide_index=True)
+            st.dataframe(ask_table, width="stretch", hide_index=True)
         else:
             st.write("No ask orders")
 
@@ -619,12 +623,12 @@ def show():
     with col1:
         st.markdown("### Order Size Distribution")
         fig_sizes = plot_order_size_distribution(order_book)
-        st.plotly_chart(fig_sizes, use_container_width=True)
+        st.plotly_chart(fig_sizes, width="stretch", config={})
 
     with col2:
         st.markdown("### Order Arrival Rate")
         fig_flow = plot_order_flow_rate(messages, window=100, date_str=date_str)
-        st.plotly_chart(fig_flow, use_container_width=True)
+        st.plotly_chart(fig_flow, width="stretch", config={})
 
     st.markdown("---")
 
@@ -635,7 +639,7 @@ def show():
 
     if order_id_input > 0:
         fig_timeline = plot_order_timeline(messages, order_id_input, date_str)
-        st.plotly_chart(fig_timeline, use_container_width=True)
+        st.plotly_chart(fig_timeline, width="stretch", config={})
 
     with st.expander("View Complete Order Book (L3)"):
         col1, col2 = st.columns(2)
@@ -644,7 +648,7 @@ def show():
             if order_book["bids"]:
                 bid_df = pd.DataFrame.from_dict(order_book["bids"], orient="index")
                 bid_df = bid_df.sort_values("price", ascending=False)
-                st.dataframe(bid_df, use_container_width=True)
+                st.dataframe(bid_df, width="stretch")
             else:
                 st.write("No bid orders")
 
@@ -653,6 +657,6 @@ def show():
             if order_book["asks"]:
                 ask_df = pd.DataFrame.from_dict(order_book["asks"], orient="index")
                 ask_df = ask_df.sort_values("price")
-                st.dataframe(ask_df, use_container_width=True)
+                st.dataframe(ask_df, width="stretch")
             else:
                 st.write("No ask orders")

@@ -175,7 +175,7 @@ else:
     ALL_SAMPLE_FILES = discover_local_datasets()
 
 
-@st.cache_data
+@st.cache_data(show_spinner="Loading data from Hugging Face...")
 def load_data_from_hf(
     message_path: str, orderbook_path: str, repo_id: str
 ) -> Tuple[Any, Any]:
@@ -185,12 +185,49 @@ def load_data_from_hf(
     ob_file = hf_hub_download(
         repo_id=repo_id, filename=orderbook_path, repo_type="dataset"
     )
-    return read_lobster(msg_file, ob_file, as_pandas=True)
+    # Keep as Polars for better performance
+    messages, orderbook = read_lobster(msg_file, ob_file, as_pandas=False)
+    # Convert to pandas for compatibility with existing visualization code
+    # TODO: Migrate visualization code to use Polars directly for 5-10x performance improvement
+    return messages.to_pandas(), orderbook.to_pandas()
+
+
+@st.cache_data(show_spinner="Loading local data files...")
+def load_data(message_path: str, orderbook_path: str) -> Tuple[Any, Any]:
+    # Keep as Polars for better performance
+    messages, orderbook = read_lobster(message_path, orderbook_path, as_pandas=False)
+    # Convert to pandas for compatibility with existing visualization code
+    # TODO: Migrate visualization code to use Polars directly for 5-10x performance improvement
+    return messages.to_pandas(), orderbook.to_pandas()
 
 
 @st.cache_data
-def load_data(message_path: str, orderbook_path: str) -> Tuple[Any, Any]:
-    return read_lobster(message_path, orderbook_path, as_pandas=True)
+def precompute_mid_prices(orderbook) -> list:
+    """Pre-compute all mid prices for the entire dataset to avoid repeated calculations."""
+    mid_prices = []
+    for i in range(len(orderbook)):
+        ob = orderbook.iloc[i]
+        ask_px = ob["ask_price_1"]
+        bid_px = ob["bid_price_1"]
+        if bid_px > 0 and ask_px < 9999999999:
+            mid = (bid_px + ask_px) / 20000.0
+            mid_prices.append(mid)
+        else:
+            mid_prices.append(None)
+    return mid_prices
+
+
+@st.cache_data
+def precompute_execution_events(messages) -> dict:
+    """Pre-compute execution event indices and statistics."""
+    exec_mask = messages["type"].isin([4, 5])
+    exec_indices = messages[exec_mask].index.tolist()
+    exec_count = len(exec_indices)
+    return {
+        "indices": exec_indices,
+        "count": exec_count,
+        "mask": exec_mask,
+    }
 
 
 def validate_ticker_files(ticker_name: str, msg_path: str, ob_path: str) -> bool:
@@ -236,7 +273,10 @@ def load_ticker_data():
         st.session_state.selected_ticker = list(available_tickers.keys())[0]
 
     def _on_ticker_change():
-        st.session_state.selected_ticker = st.session_state.get("ticker_selector", st.session_state.selected_ticker)
+        # Safely get the new ticker value
+        new_ticker = st.session_state.get("ticker_selector")
+        if new_ticker:
+            st.session_state.selected_ticker = new_ticker
         st.session_state.current_idx = 0
         st.session_state.messages = None
         st.session_state.orderbook = None

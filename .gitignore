@@ -46,3 +46,4 @@ LOBSTER_SampleFile_*/
 # Temporary files
 *.tmp
 *.log
+/GEMINI.md

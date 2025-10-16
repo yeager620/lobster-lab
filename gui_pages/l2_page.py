@@ -12,6 +12,7 @@ from .shared import (
 )
 
 
+@st.cache_data
 def get_orderbook_depth(
     ob_row: pd.Series, levels: int = 10
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -36,6 +37,29 @@ def get_orderbook_depth(
                 bids.append({"price": bid_px / 10000.0, "size": bid_sz})
 
     return pd.DataFrame(bids), pd.DataFrame(asks)
+
+
+@st.cache_data
+def format_message_details(msg: pd.Series, date_str: str = "2012-06-21") -> dict:
+    message_types = {
+        1: "New Order",
+        2: "Cancel",
+        3: "Delete",
+        4: "Exec (Vis)",
+        5: "Exec (Hid)",
+        7: "Halt",
+    }
+
+    direction_map = {1: "Buy", -1: "Sell"}
+
+    return {
+        "Time": seconds_to_eastern_time(msg["time"], date_str),
+        "Type": message_types.get(int(msg["type"]), "Unknown"),
+        "Order ID": f"{int(msg['order_id']):,}",
+        "Size": f"{int(msg['size']):,}",
+        "Price": f"${msg['price'] / 10000.0:.2f}",
+        "Side": direction_map.get(int(msg["direction"]), "?"),
+    }
 
 
 def plot_orderbook(
@@ -96,28 +120,6 @@ def plot_orderbook(
     )
 
     return fig
-
-
-def format_message_details(msg: pd.Series, date_str: str = "2012-06-21") -> dict:
-    message_types = {
-        1: "New Order",
-        2: "Cancel",
-        3: "Delete",
-        4: "Exec (Vis)",
-        5: "Exec (Hid)",
-        7: "Halt",
-    }
-
-    direction_map = {1: "Buy", -1: "Sell"}
-
-    return {
-        "Time": seconds_to_eastern_time(msg["time"], date_str),
-        "Type": message_types.get(int(msg["type"]), "Unknown"),
-        "Order ID": f"{int(msg['order_id']):,}",
-        "Size": f"{int(msg['size']):,}",
-        "Price": f"${msg['price'] / 10000.0:.2f}",
-        "Side": direction_map.get(int(msg["direction"]), "?"),
-    }
 
 
 def show():
@@ -331,7 +333,7 @@ def show():
     if not bids.empty and not asks.empty:
         fig_ob = plot_orderbook(bids, asks, current_msg)
         st.plotly_chart(
-            fig_ob, use_container_width=True, key=f"orderbook_chart_{current_idx}"
+            fig_ob, width="stretch", key=f"orderbook_chart_{current_idx}", config={}
         )
     else:
         st.warning("No valid order book data at this index.")
@@ -340,8 +342,8 @@ def show():
         col1, col2 = st.columns(2)
         with col1:
             st.write("**Message Data**")
-            st.dataframe(current_msg.to_frame(), use_container_width=True)
+            st.dataframe(current_msg.to_frame(), width="stretch")
         with col2:
             st.write("**Order Book Data (First 10 levels)**")
             ob_display = current_ob.to_frame().head(40)
-            st.dataframe(ob_display, use_container_width=True)
+            st.dataframe(ob_display, width="stretch")
