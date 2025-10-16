@@ -427,6 +427,9 @@ def show():
         )
         return
 
+    render_sidebar(playback_enabled=False)
+
+    st.sidebar.markdown("---")
     st.sidebar.header("Visualization Settings")
 
     chart_window = st.sidebar.slider(
@@ -439,33 +442,8 @@ def show():
     )
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Time Navigation")
 
-    max_idx = len(messages) - 1
-
-    current_idx = st.sidebar.slider(
-        "Event Index",
-        min_value=0,
-        max_value=max_idx,
-        value=st.session_state.current_idx,
-        step=1,
-        key="l1_idx_slider",
-    )
-    st.session_state.current_idx = current_idx
-
-    jump_col1, jump_col2, jump_col3 = st.sidebar.columns(3)
-    with jump_col1:
-        if st.button("-1000", key="l1_jump_back_1000", use_container_width=True):
-            st.session_state.current_idx = max(0, current_idx - 1000)
-            st.rerun()
-    with jump_col2:
-        if st.button("Reset", key="l1_jump_reset", use_container_width=True):
-            st.session_state.current_idx = 0
-            st.rerun()
-    with jump_col3:
-        if st.button("+1000", key="l1_jump_fwd_1000", use_container_width=True):
-            st.session_state.current_idx = min(max_idx, current_idx + 1000)
-            st.rerun()
+    current_idx = st.session_state.current_idx
 
     current_ob = orderbook.iloc[current_idx]
 

@@ -240,6 +240,10 @@ def init_session_state():
         st.session_state.orderbook_polars = None
     if "order_book_last_idx" not in st.session_state:
         st.session_state.order_book_last_idx = None
+    if "is_playing" not in st.session_state:
+        st.session_state.is_playing = False
+    if "playback_interval" not in st.session_state:
+        st.session_state.playback_interval = 0.5
     if "data_source" not in st.session_state:
         st.session_state.data_source = "Hugging Face" if USE_HUGGINGFACE else "Local"
     if "data_loaded" not in st.session_state:
@@ -248,6 +252,8 @@ def init_session_state():
         st.session_state.data_cache_key = None
     if "order_book_cache" not in st.session_state:
         st.session_state.order_book_cache = None
+    if "step_size_selector" not in st.session_state:
+        st.session_state.step_size_selector = 1
 
 def load_ticker_data():
     available_tickers = get_available_tickers(ALL_SAMPLE_FILES)
@@ -276,6 +282,9 @@ def load_ticker_data():
         st.session_state.data_loaded = False
         st.session_state.data_cache_key = None
         st.session_state.order_book_cache = None
+        st.session_state.is_playing = False
+        st.session_state.step_size_selector = 1
+        st.session_state.last_search_result = None
 
     st.sidebar.selectbox(
         "Select Ticker",
@@ -302,6 +311,9 @@ def load_ticker_data():
                 st.session_state.orderbook = orderbook
                 st.session_state.order_book_cache = None
                 st.session_state.data_loaded = True
+                st.session_state.current_idx = 0
+                st.session_state.is_playing = False
+                st.session_state.last_search_result = None
         except Exception as e:
             st.error(f"Error loading data: {e}")
             if USE_HUGGINGFACE:

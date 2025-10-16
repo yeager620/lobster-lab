@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 from typing import Tuple, Any, Iterable
 
@@ -70,7 +71,7 @@ def render_metrics_grid(
             with col:
                 st.metric(label, value)
 
-def render_sidebar():
+def render_sidebar(*, playback_enabled: bool = True) -> None:
     st.sidebar.header("Playback Controls")
 
     max_idx = len(st.session_state.messages) - 1
@@ -79,9 +80,33 @@ def render_sidebar():
     if st.session_state.current_idx < 0:
         st.session_state.current_idx = 0
 
-    step_size = st.sidebar.selectbox(
-        "Step Size", [1, 10, 100, 1000], index=0, key="step_size_selector"
+    max_step = max_idx + 1 if max_idx >= 0 else 1
+    existing_step = int(st.session_state.get("step_size_selector", 1) or 1)
+    bounded_step = min(max(existing_step, 1), max_step)
+    st.session_state.step_size_selector = bounded_step
+    step_size = int(
+        st.sidebar.number_input(
+            "Step Size",
+            min_value=1,
+            max_value=max_step,
+            value=bounded_step,
+            step=1,
+            key="step_size_selector",
+        )
     )
+
+    if playback_enabled:
+        if "is_playing" not in st.session_state:
+            st.session_state.is_playing = False
+        if "playback_interval" not in st.session_state:
+            st.session_state.playback_interval = 0.5
+
+        play_label = "Pause" if st.session_state.is_playing else "Play"
+        if st.sidebar.button(
+            play_label, key="play_pause_button", use_container_width=True
+        ):
+            st.session_state.is_playing = not st.session_state.is_playing
+            st.rerun()
 
     st.sidebar.markdown("**Navigation**")
     nav_col1, nav_col2 = st.sidebar.columns([1, 1])
@@ -91,10 +116,12 @@ def render_sidebar():
             st.session_state.current_idx = max(
                 0, st.session_state.current_idx - step_size
             )
+            st.session_state.is_playing = False
             st.rerun()
 
         if st.button("-1", key="btn_back_one", use_container_width=True):
             st.session_state.current_idx = max(0, st.session_state.current_idx - 1)
+            st.session_state.is_playing = False
             st.rerun()
 
     with nav_col2:
@@ -102,16 +129,29 @@ def render_sidebar():
             st.session_state.current_idx = min(
                 max_idx, st.session_state.current_idx + step_size
             )
+            st.session_state.is_playing = False
             st.rerun()
 
         if st.button("+1", key="btn_next_one", use_container_width=True):
             st.session_state.current_idx = min(
                 max_idx, st.session_state.current_idx + 1
             )
+            st.session_state.is_playing = False
             st.rerun()
 
     if st.sidebar.button("Reset to Start", key="btn_reset", use_container_width=True):
         st.session_state.current_idx = 0
+        st.session_state.is_playing = False
+        st.rerun()
+
+    if playback_enabled and st.session_state.is_playing and max_idx >= 0:
+        interval = max(float(st.session_state.playback_interval), 0.1)
+        time.sleep(interval)
+        next_idx = min(max_idx, st.session_state.current_idx + step_size)
+        if next_idx == st.session_state.current_idx:
+            st.session_state.is_playing = False
+        else:
+            st.session_state.current_idx = next_idx
         st.rerun()
 
     st.sidebar.markdown("---")
@@ -148,6 +188,7 @@ def render_sidebar():
                 st.session_state.last_search_result = (
                     f"Jumped to {event_type[1]} at #{found_idx}"
                 )
+                st.session_state.is_playing = False
                 st.rerun()
             else:
                 st.session_state.last_search_result = (
@@ -168,6 +209,7 @@ def render_sidebar():
                 st.session_state.last_search_result = (
                     f"Jumped to {event_type[1]} at #{found_idx}"
                 )
+                st.session_state.is_playing = False
                 st.rerun()
             else:
                 st.session_state.last_search_result = f"No next {event_type[1]} found"
@@ -179,6 +221,7 @@ def render_sidebar():
             st.sidebar.warning(st.session_state.last_search_result)
         if st.sidebar.button("Clear message", key="clear_search_msg"):
             st.session_state.last_search_result = None
+            st.session_state.is_playing = False
             st.rerun()
 
     st.sidebar.markdown("---")
@@ -196,4 +239,5 @@ def render_sidebar():
     if manual_idx != st.session_state.current_idx:
         st.session_state.current_idx = manual_idx
         st.session_state.last_search_result = None
+        st.session_state.is_playing = False
         st.rerun()
