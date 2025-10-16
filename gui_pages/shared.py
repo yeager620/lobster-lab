@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timedelta
 import zoneinfo
 
-HF_REPO_ID = os.getenv("HF_REPO_ID", "totalorganfailure/lobster-data")
+HF_REPO_ID = os.getenv("HF_REPO_ID", "totalorganfailure/lobster-lab-data")
 
 if not HF_REPO_ID and hasattr(st, "secrets") and "HF_REPO_ID" in st.secrets:
     HF_REPO_ID = st.secrets["HF_REPO_ID"]
@@ -21,10 +21,10 @@ _GLOBAL_STYLE = """
 <style>
 /* Establish responsive typography that scales with viewport width */
 :root {
-    --lobster-h1: clamp(2.0rem, 2.4vw + 0.8rem, 3.2rem);
-    --lobster-h2: clamp(1.6rem, 1.9vw + 0.6rem, 2.4rem);
-    --lobster-h3: clamp(1.35rem, 1.4vw + 0.55rem, 1.9rem);
-    --lobster-text: clamp(0.95rem, 0.95vw + 0.55rem, 1.1rem);
+    --lobster-lab-h1: clamp(2.0rem, 2.4vw + 0.8rem, 3.2rem);
+    --lobster-lab-h2: clamp(1.6rem, 1.9vw + 0.6rem, 2.4rem);
+    --lobster-lab-h3: clamp(1.35rem, 1.4vw + 0.55rem, 1.9rem);
+    --lobster-lab-text: clamp(0.95rem, 0.95vw + 0.55rem, 1.1rem);
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -33,11 +33,11 @@ h1, h2, h3, h4, h5, h6 {
     margin-bottom: 0.75rem !important;
 }
 
-h1 { font-size: var(--lobster-h1) !important; }
-h2 { font-size: var(--lobster-h2) !important; }
-h3 { font-size: var(--lobster-h3) !important; }
+h1 { font-size: var(--lobster-lab-h1) !important; }
+h2 { font-size: var(--lobster-lab-h2) !important; }
+h3 { font-size: var(--lobster-lab-h3) !important; }
 p, li, span, label {
-    font-size: var(--lobster-text) !important;
+    font-size: var(--lobster-lab-text) !important;
     line-height: 1.5 !important;
 }
 

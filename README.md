@@ -21,7 +21,7 @@ uv sync
 ### Run GUI
 
 ```bash
-# Run with default HuggingFace dataset (totalorganfailure/lobster-data)
+# Run with default HuggingFace dataset (totalorganfailure/lobster-lab-data)
 uv run streamlit run gui_app.py
 
 # Run with custom HuggingFace dataset
@@ -84,22 +84,22 @@ export HF_REPO_ID="your-username/lobster-data"  # HuggingFace dataset repo
 uv run huggingface-cli login
 
 # Sync all datasets
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-data
+uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data
 
 # Dry run to preview changes
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-data --dry-run
+uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --dry-run
 
 # Sync specific tickers
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-data --tickers AAPL MSFT
+uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --tickers AAPL MSFT
 
 # Update README only
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-data --force-readme
+uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --force-readme
 
 # Keep local files after upload
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-data --keep-local
+uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --keep-local
 
 # Create private dataset
-uv run python scripts/sync_datasets.py --repo-id your-username/lobster-data --private
+uv run python scripts/sync_datasets.py --repo-id your-username/lobster-lab-data --private
 ```
 
 ## Data Format
