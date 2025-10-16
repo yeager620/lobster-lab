@@ -42,33 +42,40 @@ jobs:
 
           echo "Deploying to HF Space: $HF_SPACE_NAME"
 
-          # Clone repository
-          git clone . hf-deploy --branch main
+          rm -rf hf-deploy
+          mkdir hf-deploy
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude 'hf-deploy/' \
+            ./ hf-deploy/
+
           cd hf-deploy
 
-          # Use HuggingFace Space README
           cp README_HF.md README.md
 
-          # Remove PNG (and other tracked binary) assets from the deployment
-          mapfile -d '' png_files < <(git ls-files -z '*.png') || true
-          if [ "${#png_files[@]}" -gt 0 ]; then
-            echo "Excluding PNG assets from Hugging Face deployment:"
-            for file in "${png_files[@]}"; do
-              echo "  - $file"
-            done
-            git rm --cached "${png_files[@]}"
-          else
-            echo "No PNG assets to exclude from Hugging Face deployment."
+          deleted_assets=false
+          while IFS= read -r -d '' asset; do
+            if [ "$deleted_assets" = false ]; then
+              echo "Excluding binary assets from Hugging Face deployment:"
+              deleted_assets=true
+            fi
+            echo "  - ${asset#./}"
+            rm -f "$asset"
+          done < <(find . -type f \
+            \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' -o -iname '*.webp' \) -print0)
+
+          if [ "$deleted_assets" = false ]; then
+            echo "No binary assets to exclude from Hugging Face deployment."
           fi
 
-          # Commit deployment-specific changes (README swap and filtered assets)
-          git add README.md
-          git commit -m "Prepare Hugging Face deployment artifacts" || true
+          git init
+          git checkout -b main
+          git add .
+          git commit -m "Prepare Hugging Face deployment artifacts"
 
-          # Push to HF Spaces (using generic username for HF git auth)
           git remote add hf https://hf:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME
 
-          echo "📤 Pushing to HuggingFace Spaces..."
+          echo "Pushing to HuggingFace Spaces..."
           git push hf main:main --force
 
           cd ..
