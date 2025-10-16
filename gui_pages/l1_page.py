@@ -75,7 +75,6 @@ def plot_price_candlestick(
     candle_window = 50
     candle_data = create_candlestick_data(msg_window, ob_window, window=candle_window)
 
-    # Convert times to Eastern
     date_str = get_dataset_date(ticker_name)
 
     fig = go.Figure()

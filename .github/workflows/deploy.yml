@@ -30,12 +30,17 @@ jobs:
           git config --global user.name "github-actions[bot]"
 
           if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE_NAME" ]; then
-            echo "HuggingFace deployment failed: cant find secrets"
+            echo "⚠️  HuggingFace deployment skipped: missing secrets"
             echo "Add HF_TOKEN and HF_SPACE_NAME to repository secrets"
             exit 0
           fi
 
-          echo "Deploying to HF Space: $HF_SPACE_NAME"
+          if [ ! -f "README_HF.md" ]; then
+            echo "⚠️  HuggingFace deployment skipped: README_HF.md not found"
+            exit 0
+          fi
+
+          echo "🚀 Deploying to HF Space: $HF_SPACE_NAME"
 
           pip install git-filter-repo
 
@@ -43,21 +48,32 @@ jobs:
 
           cd hf-deploy
 
-          git filter-repo --path LOBSTER_SampleFile_AAPL_2012-06-21_10 --invert-paths --force
-          git filter-repo --path LOBSTER_SampleFile_GOOG_2012-06-21_10 --invert-paths --force
-          git filter-repo --path LOBSTER_SampleFile_MSFT_2012-06-21_10 --invert-paths --force
-          git filter-repo --path LOBSTER_SampleFile_SPY_2012-06-21_50 --invert-paths --force
+          # Remove all LOBSTER sample files in one pass for better performance
+          # This prevents pushing large CSV files to HF Spaces
+          if ls LOBSTER_SampleFile_* >/dev/null 2>&1; then
+            echo "📦 Filtering out large LOBSTER sample files..."
+            for dir in LOBSTER_SampleFile_*; do
+              if [ -d "$dir" ]; then
+                git filter-repo --path "$dir" --invert-paths --force
+              fi
+            done
+          fi
 
+          # Use HuggingFace Space README
           cp README_HF.md README.md
           git add README.md
           git commit -m "Configure HuggingFace Space" || true
 
-          git remote add hf https://HF_USER:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME
+          # Push to HF Spaces (using generic username for HF git auth)
+          git remote add hf https://hf:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME
 
+          echo "📤 Pushing to HuggingFace Spaces..."
           git push hf main:main --force
 
           cd ..
           rm -rf hf-deploy
+
+          echo "✅ HuggingFace deployment complete!"
 
       - name: Trigger Streamlit Cloud Deployment
         env:

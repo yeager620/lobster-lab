@@ -17,21 +17,8 @@ from .shared import (
 def reconstruct_order_book_state(
     messages: pd.DataFrame, up_to_idx: int, max_lookback: int = 50000
 ) -> Dict:
-    """
-    Reconstruct order book state with windowed processing for memory efficiency.
-
-    Args:
-        messages: Message DataFrame
-        up_to_idx: Index to reconstruct up to
-        max_lookback: Maximum number of messages to process (default 50k for memory efficiency)
-
-    Returns:
-        Dictionary with bids and asks order books
-    """
     order_book = {"bids": {}, "asks": {}}
 
-    # Use windowed reconstruction to avoid processing millions of messages
-    # Start from max(0, up_to_idx - max_lookback) to limit memory usage
     start_idx = max(0, up_to_idx - max_lookback)
 
     for i in range(start_idx, min(up_to_idx + 1, len(messages))):
@@ -119,14 +106,12 @@ def plot_order_book_depth_with_queue(
 
     fig = go.Figure()
 
-    # Bid side - aggregate bars with individual order segments
     if bid_levels:
         for idx, (price, orders) in enumerate(bid_levels):
             orders_sorted = sorted(orders, key=lambda x: x["time"])
             total_size = sum(o["size"] for o in orders_sorted)
             queue_length = len(orders_sorted)
 
-            # Create hover text with queue details
             hover_lines = [
                 f"<b>Bid @ ${float(price):.2f}</b>",
                 f"Total Size: {total_size:,} shares",
@@ -134,7 +119,6 @@ def plot_order_book_depth_with_queue(
                 "<br><b>Queue Details:</b>",
             ]
 
-            # Show top 5 orders in queue
             for i, order in enumerate(orders_sorted[:5]):
                 hover_lines.append(
                     f"  #{i + 1}: {order['size']:,} sh (ID: {order['id']})"
@@ -142,7 +126,6 @@ def plot_order_book_depth_with_queue(
             if len(orders_sorted) > 5:
                 hover_lines.append(f"  ... and {len(orders_sorted) - 5} more")
 
-            # Add main bar for total size
             fig.add_trace(
                 go.Bar(
                     x=[total_size],
@@ -152,9 +135,9 @@ def plot_order_book_depth_with_queue(
                     marker=dict(color="rgba(0, 180, 0, 0.7)"),
                     hovertemplate="%{customdata}<extra></extra>",
                     customdata=["<br>".join(hover_lines)],
-                    showlegend=True if idx == 0 else False,  # Only show legend once
+                    showlegend=True if idx == 0 else False,  
                     legendgroup="bids",
-                    width=[0.004],  # Uniform bar thickness in price units (~$0.004)
+                    width=[0.004], 
                 )
             )
 
