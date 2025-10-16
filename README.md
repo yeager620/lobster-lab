@@ -6,6 +6,11 @@ Interactive visualization and backtesting toolkit for LOBSTER limit order book d
 
 [**Hugging Face Spaces**](https://huggingface.co/spaces/totalorganfailure/lobster-lab)
 
+<img src="streamlit_02" alt="book_head">
+
+<img src="streamlit_01" alt="book_chart">
+
+
 ## Features
 
 - **L1 View**: Price action with candlesticks, volume profiles, and execution analysis
@@ -70,3 +75,4 @@ For each level i: `[ask_price_i, ask_size_i, bid_price_i, bid_size_i]`
 
 
 Unoccupied levels: `ask_price=9999999999, bid_price=-9999999999, size=0`
+
