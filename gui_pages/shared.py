@@ -235,20 +235,22 @@ def load_ticker_data():
     if st.session_state.selected_ticker not in available_tickers:
         st.session_state.selected_ticker = list(available_tickers.keys())[0]
 
-    selected_ticker = st.sidebar.selectbox(
-        "Select Ticker",
-        list(available_tickers.keys()),
-        index=list(available_tickers.keys()).index(st.session_state.selected_ticker),
-        key="ticker_selector",
-    )
-
-    if selected_ticker != st.session_state.selected_ticker:
-        st.session_state.selected_ticker = selected_ticker
+    def _on_ticker_change():
+        st.session_state.selected_ticker = st.session_state.get("ticker_selector", st.session_state.selected_ticker)
         st.session_state.current_idx = 0
         st.session_state.messages = None
         st.session_state.orderbook = None
         st.session_state.data_loaded = False
 
+    st.sidebar.selectbox(
+        "Select Ticker",
+        list(available_tickers.keys()),
+        index=list(available_tickers.keys()).index(st.session_state.selected_ticker),
+        key="ticker_selector",
+        on_change=_on_ticker_change,
+    )
+
+    selected_ticker = st.session_state.selected_ticker
     msg_path, ob_path = available_tickers[selected_ticker]
 
     if not st.session_state.data_loaded:
