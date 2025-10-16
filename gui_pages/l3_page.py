@@ -121,14 +121,14 @@ def plot_order_book_depth_with_queue(
 
     # Bid side - aggregate bars with individual order segments
     if bid_levels:
-        for price, orders in bid_levels:
+        for idx, (price, orders) in enumerate(bid_levels):
             orders_sorted = sorted(orders, key=lambda x: x["time"])
             total_size = sum(o["size"] for o in orders_sorted)
             queue_length = len(orders_sorted)
 
             # Create hover text with queue details
             hover_lines = [
-                f"<b>Bid @ ${price:.2f}</b>",
+                f"<b>Bid @ ${float(price):.2f}</b>",
                 f"Total Size: {total_size:,} shares",
                 f"Orders in Queue: {queue_length}",
                 "<br><b>Queue Details:</b>",
@@ -146,14 +146,15 @@ def plot_order_book_depth_with_queue(
             fig.add_trace(
                 go.Bar(
                     x=[total_size],
-                    y=[price],
+                    y=[float(price)],
                     orientation="h",
                     name="Bids",
                     marker=dict(color="rgba(0, 180, 0, 0.7)"),
                     hovertemplate="%{customdata}<extra></extra>",
                     customdata=["<br>".join(hover_lines)],
-                    showlegend=bool(price == bid_levels[0][0]),  # Only show legend once
+                    showlegend=True if idx == 0 else False,  # Only show legend once
                     legendgroup="bids",
+                    width=[0.004],  # Uniform bar thickness in price units (~$0.004)
                 )
             )
 
@@ -166,22 +167,22 @@ def plot_order_book_depth_with_queue(
                         type="line",
                         x0=cumulative,
                         x1=cumulative,
-                        y0=price - 0.003,
-                        y1=price + 0.003,  # Small vertical line
+                        y0=float(price) - 0.003,
+                        y1=float(price) + 0.003,  # Small vertical line
                         line=dict(color="rgba(255, 255, 255, 0.6)", width=2),
                         layer="above",
                     )
 
     # Ask side - aggregate bars with individual order segments
     if ask_levels:
-        for price, orders in ask_levels:
+        for idx, (price, orders) in enumerate(ask_levels):
             orders_sorted = sorted(orders, key=lambda x: x["time"])
             total_size = sum(o["size"] for o in orders_sorted)
             queue_length = len(orders_sorted)
 
             # Create hover text with queue details
             hover_lines = [
-                f"<b>Ask @ ${price:.2f}</b>",
+                f"<b>Ask @ ${float(price):.2f}</b>",
                 f"Total Size: {total_size:,} shares",
                 f"Orders in Queue: {queue_length}",
                 "<br><b>Queue Details:</b>",
@@ -199,14 +200,15 @@ def plot_order_book_depth_with_queue(
             fig.add_trace(
                 go.Bar(
                     x=[total_size],
-                    y=[price],
+                    y=[float(price)],
                     orientation="h",
                     name="Asks",
                     marker=dict(color="rgba(255, 50, 50, 0.7)"),
                     hovertemplate="%{customdata}<extra></extra>",
                     customdata=["<br>".join(hover_lines)],
-                    showlegend=bool(price == ask_levels[0][0]),  # Only show legend once
+                    showlegend=True if idx == 0 else False,  # Only show legend once
                     legendgroup="asks",
+                    width=[0.004],  # Uniform bar thickness in price units (~$0.004)
                 )
             )
 
@@ -219,8 +221,8 @@ def plot_order_book_depth_with_queue(
                         type="line",
                         x0=cumulative,
                         x1=cumulative,
-                        y0=price - 0.003,
-                        y1=price + 0.003,  # Small vertical line
+                        y0=float(price) - 0.003,
+                        y1=float(price) + 0.003,  # Small vertical line
                         line=dict(color="rgba(255, 255, 255, 0.6)", width=2),
                         layer="above",
                     )
@@ -241,6 +243,8 @@ def plot_order_book_depth_with_queue(
         xaxis_title="Shares",
         yaxis_title="Price ($)",
         barmode="overlay",
+        bargap=0.2,  # consistent spacing between price levels
+        bargroupgap=0.1,
         height=500,
         hovermode="closest",
         showlegend=True,

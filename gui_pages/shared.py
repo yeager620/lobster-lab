@@ -253,29 +253,27 @@ def load_ticker_data():
     msg_path, ob_path = available_tickers[selected_ticker]
 
     if not st.session_state.data_loaded:
-        st.sidebar.markdown("---")
-        if st.sidebar.button("Load Data", type="primary", use_container_width=True):
-            try:
-                with st.spinner(f"Loading LOBSTER data from {data_source}..."):
-                    if USE_HUGGINGFACE:
-                        messages, orderbook = load_data_from_hf(
-                            msg_path, ob_path, HF_REPO_ID
-                        )
-                    else:
-                        messages, orderbook = load_data(msg_path, ob_path)
-                    st.session_state.messages = messages
-                    st.session_state.orderbook = orderbook
-                    st.session_state.data_loaded = True
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Error loading data: {e}")
+        # Auto-load data lazily when a ticker is selected (no button)
+        try:
+            with st.spinner(f"Loading LOBSTER data from {data_source}..."):
                 if USE_HUGGINGFACE:
-                    st.error(f"Repository: {HF_REPO_ID}")
-                st.error(f"Message path: {msg_path}")
-                st.error(f"Orderbook path: {ob_path}")
-                return None, None, available_tickers
+                    messages, orderbook = load_data_from_hf(
+                        msg_path, ob_path, HF_REPO_ID
+                    )
+                else:
+                    messages, orderbook = load_data(msg_path, ob_path)
+                st.session_state.messages = messages
+                st.session_state.orderbook = orderbook
+                st.session_state.data_loaded = True
+                st.rerun()
+        except Exception as e:
+            st.error(f"Error loading data: {e}")
+            if USE_HUGGINGFACE:
+                st.error(f"Repository: {HF_REPO_ID}")
+            st.error(f"Message path: {msg_path}")
+            st.error(f"Orderbook path: {ob_path}")
+            return None, None, available_tickers
 
-        st.info("Click 'Load Data' to begin")
         return None, None, available_tickers
 
     messages = st.session_state.messages

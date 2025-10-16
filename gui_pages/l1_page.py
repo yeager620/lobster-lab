@@ -99,14 +99,14 @@ def plot_price_candlestick(
 
     exec_events = msg_window[msg_window["type"].isin([4, 5])]
     if not exec_events.empty:
-        exec_prices = exec_events["price"] / 10000.0
+        exec_prices = exec_events["price"].astype(float) / 10000.0
         exec_times_et = [
             seconds_to_eastern_time(t, date_str) for t in exec_events["time"]
         ]
         fig.add_trace(
             go.Scatter(
                 x=exec_times_et,
-                y=exec_prices,
+                y=exec_prices.astype(float),
                 mode="markers",
                 name="Executions",
                 marker=dict(color="orange", size=6, symbol="diamond"),

@@ -47,7 +47,7 @@ def plot_orderbook(
         fig.add_trace(
             go.Bar(
                 x=bids["size"],
-                y=bids["price"],
+                y=bids["price"].astype(float),
                 orientation="h",
                 name="Bids",
                 marker=dict(color="rgba(0, 180, 0, 0.7)"),
@@ -59,7 +59,7 @@ def plot_orderbook(
         fig.add_trace(
             go.Bar(
                 x=asks["size"],
-                y=asks["price"],
+                y=asks["price"].astype(float),
                 orientation="h",
                 name="Asks",
                 marker=dict(color="rgba(255, 50, 50, 0.7)"),
@@ -68,11 +68,12 @@ def plot_orderbook(
         )
 
     if current_msg is not None and current_msg["type"] in [4, 5]:
-        exec_price = current_msg["price"] / 10000.0
-        exec_size = current_msg["size"]
-        direction = "BUY" if current_msg["direction"] == -1 else "SELL"
+        exec_price = float(current_msg["price"]) / 10000.0
+        exec_size = int(current_msg["size"]) if pd.notna(current_msg["size"]) else 0
+        direction_val = int(current_msg["direction"]) if pd.notna(current_msg["direction"]) else 0
+        direction = "BUY" if direction_val == -1 else "SELL"
         fig.add_hline(
-            y=exec_price,
+            y=float(exec_price),
             line_dash="dash",
             line_color="yellow",
             line_width=3,
