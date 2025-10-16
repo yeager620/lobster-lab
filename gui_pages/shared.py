@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timedelta
 import zoneinfo
 
-HF_REPO_ID = os.getenv("HF_REPO_ID", "totalorganfailure/lobster-lab-data")
+HF_REPO_ID = os.getenv("HF_REPO_ID", "totalorganfailure/lobster-data")
 
 if not HF_REPO_ID and hasattr(st, "secrets") and "HF_REPO_ID" in st.secrets:
     HF_REPO_ID = st.secrets["HF_REPO_ID"]
